@@ -3,13 +3,13 @@
 
 #include "smt.h"
 //#include "z3_sort.h"
-#include "z3++.h"
+// #include "z3++.h"
 
 #include "z3_factory.h"
 
 using namespace smt;
 using namespace std;
-using namespace z3;
+// using namespace z3;
 
 int main()
 {

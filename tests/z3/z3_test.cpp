@@ -16,7 +16,7 @@ int main() {
 	SmtSolver s = Z3SolverFactory::create(false);
 	cout << "after solver creation " << endl;
 
-	cout << "..." << endl;
+	cout << "* * * sort testing * * *" << endl;
 	Sort boolsort1 = s->make_sort(BOOL);
 	Sort realsort1 = s->make_sort(REAL);
 	Sort intsort1 = s->make_sort(INT);
@@ -33,6 +33,22 @@ int main() {
 
 	Sort functionsort = s->make_sort(FUNCTION, SortVec{ boolsort1, intsort1, realsort1, boolsort1 } );
 	cout << functionsort << endl;
+
+	cout << "* * * end sort testing * * *" << endl << "* * * term testing * * *" << endl;
+
+	Term boolterm1 = s-> make_term(true);
+	Term boolterm2 = s-> make_term(false);
+	cout << boolterm1 << endl;
+	cout << boolterm2 << endl;
+
+	Term intterm = s->make_term(1, intsort1);
+	Term realterm = s->make_term(2, realsort1);
+	Term bvterm = s->make_term(8, bvsort);
+	cout << intterm << endl;
+	cout << realterm << endl;
+	cout << bvterm << endl;
+
+	cout << "* * * end term testing * * *" << endl;
 
 	cout << "testing done :)" << endl;
 

@@ -88,8 +88,12 @@ void Z3Solver::set_logic(const std::string logic) {
 }
 
 Term Z3Solver::make_term(bool b) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	expr z_term = ctx.bool_val(false);
+	if (b) {
+		z_term = ctx.bool_val(true);
+	}
+
+	return std::make_shared < Z3Term > (z_term);
 }
 
 Sort Z3Solver::make_sort(const DatatypeDecl &d) const {
@@ -136,14 +140,51 @@ Term Z3Solver::get_selector(const Sort &s, std::string con,
 ;
 
 Term Z3Solver::make_term(int64_t i, const Sort &sort) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	SortKind sk = sort->get_sort_kind();
+	expr z_term = ctx.bool_val(true);	//change me
+	if (sk == INT) {
+		z_term = ctx.int_val(i);
+	} else if (sk == REAL) {
+		z_term = ctx.real_val(i);
+	} else if (sk == BV) {
+		z_term = ctx.bv_val(sort->get_width(), i);//why did yices use const here
+	} else {
+		string msg("Can't create value ");
+		msg += i;
+		msg += " with sort ";
+		msg += sort->to_string();
+		throw IncorrectUsageException(msg);
+	}
+
+	return std::make_shared < Z3Term > (z_term);
 }
 
 Term Z3Solver::make_term(const std::string val, const Sort &sort,
 		uint64_t base) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	expr z_term = ctx.bool_val(true);	//change me
+	SortKind sk = sort->get_sort_kind();
+
+	if (sk == BV) {
+		z_term = ctx.bv_const(val.c_str(), sort->get_width());	//why am i throwing out base?
+	} else if (sk == REAL) {
+		if (base != 10) {
+			throw NotImplementedException(
+					"Does not support base not equal to 10.");
+		}
+
+		z_term = ctx.real_const(val.c_str());
+	} else if (sk == INT) {
+		int i = stoi(val);
+		z_term = ctx.int_val(i);	//ugh why is this jumping between val and const
+	} else {
+		string msg("Can't create value ");
+		msg += val;
+		msg += " with sort ";
+		msg += sort->to_string();
+		throw IncorrectUsageException(msg);
+	}
+
+	return std::make_shared < Z3Term > (z_term);
 }
 
 Term Z3Solver::make_term(const Term &val, const Sort &sort) const {

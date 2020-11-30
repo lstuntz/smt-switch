@@ -11,70 +11,77 @@ using namespace std;
 
 namespace smt {
 
-/* Z3 Op mappings */
-// typedef term_t (*Z3_un_fun)(term_t);
-// typedef term_t (*Z3_bin_fun)(term_t, term_t);
-// typedef term_t (*Z3_tern_fun)(term_t, term_t, term_t);
-// typedef term_t (*Z3_variadic_fun)(uint32_t, term_t[]);
-// TODO's:
-// Pretty sure not implemented in Z3.
-// Good candidates for extension.
-//  To_Real,
-//  BVComp,
-//  BV_To_Nat,
-// Arrays are represented as functions in Z3.
-// I don't think const_array can be supported,
-// unless we use Z3 lambdas.
-// Const_Array,
-// const unordered_map<PrimOp, Z3_un_fun> Z3_unary_ops(
-//     { { Not, Z3_not },
-//       { Negate, Z3_neg },
-//       { Abs, Z3_abs },
-//       { To_Int, Z3_floor },
-//       { Is_Int, Z3_is_int_atom },
-//       { BVNot, Z3_bvnot },
-//       { BVNeg, Z3_bvneg } });
-// const unordered_map<PrimOp, Z3_bin_fun> Z3_binary_ops(
-//     { { And, Z3_and2 },          { Or, Z3_or2 },
-//       { Xor, Z3_xor2 },          { Implies, Z3_implies },
-//       { Iff, Z3_iff },           { Plus, Z3_add },
-//       { Minus, Z3_sub },         { Mult, Z3_mul },
-//       { Div, Z3_division },      { Lt, Z3_arith_lt_atom },
-//       { IntDiv, Z3_idiv },       { Le, Z3_arith_leq_atom },
-//       { Gt, Z3_arith_gt_atom },  { Ge, Z3_arith_geq_atom },
-//       { Equal, Z3_eq },          { Mod, Z3_imod },
-//       { Concat, Z3_bvconcat2 },  { BVAnd, Z3_bvand2 },
-//       { BVOr, Z3_bvor2 },        { BVXor, Z3_bvxor2 },
-//       { BVNand, Z3_bvnand },     { BVNor, Z3_bvnor },
-//       { BVXnor, Z3_bvxnor },     { BVAdd, Z3_bvadd },
-//       { BVSub, Z3_bvsub },       { BVMul, Z3_bvmul },
-//       { BVUdiv, Z3_bvdiv },      { BVUrem, Z3_bvrem },
-//       { BVSdiv, Z3_bvsdiv },     { BVSrem, Z3_bvsrem },
-//       { BVSmod, Z3_bvsmod },     { BVShl, Z3_bvshl },
-//       { BVAshr, Z3_bvashr },     { BVLshr, Z3_bvlshr },
-//       { BVUlt, Z3_bvlt_atom },   { BVUle, Z3_bvle_atom },
-//       { BVUgt, Z3_bvgt_atom },   { BVUge, Z3_bvge_atom },
-//       { BVSle, Z3_bvsle_atom },  { BVSlt, Z3_bvslt_atom },
-//       { BVSge, Z3_bvsge_atom },  { BVSgt, Z3_bvsgt_atom },
-//       { Select, ext_Z3_select }, { Apply, Z3_application1 }
-//     });
-// const unordered_map<PrimOp, Z3_tern_fun> Z3_ternary_ops(
-//     { { And, Z3_and3 },
-//       { Or, Z3_or3 },
-//       { Xor, Z3_xor3 },
-//       { Ite, Z3_ite },
-//       { BVAnd, Z3_bvand3 },
-//       { BVOr, Z3_bvor3 },
-//       { BVXor, Z3_bvxor3 },
-//       { Apply, Z3_application2 },
-//       { Store, ext_Z3_store } });
-// const unordered_map<PrimOp, Z3_variadic_fun> Z3_variadic_ops({
-//     { And, Z3_and },
-//     { Or, Z3_or },
-//     { Xor, Z3_xor },
-//     { Distinct, Z3_distinct }
-//     // { BVAnd, Z3_bvand } has different format.
-// });
+/* CVC4 Op mappings */
+const std::unordered_map<PrimOp, Z3_decl_kind> primop2kind( {
+		{ And, Z3_OP_AND }, { Or, Z3_OP_OR }, { Xor, Z3_OP_XOR }, { Not,
+				Z3_OP_NOT }, { Implies, Z3_OP_IMPLIES }, { Ite, Z3_OP_ITE }, {
+				Iff, Z3_OP_IFF }, { Equal, Z3_OP_EQ }, { Distinct,
+				Z3_OP_DISTINCT },
+//      /* Uninterpreted Functions */
+//      { Apply, ::CVC4::api::APPLY_UF },
+		/* Arithmetic Theories */
+		{ Plus, Z3_OP_ADD }, { Minus, Z3_OP_SUB }, { Negate, Z3_OP_UMINUS }, {
+				Mult, Z3_OP_MUL }, { Div, Z3_OP_DIV }, { IntDiv, Z3_OP_IDIV }, {
+				Lt, Z3_OP_LT }, { Le, Z3_OP_LE }, { Gt, Z3_OP_GT }, { Ge,
+				Z3_OP_GE }, { Mod, Z3_OP_MOD },
+//      { Abs, ::CVC4::api::ABS },
+		{ Pow, Z3_OP_POWER }, { To_Real, Z3_OP_TO_REAL },
+		{ To_Int, Z3_OP_TO_INT }, { Is_Int, Z3_OP_IS_INT },
+//      /* Fixed Size BitVector Theory */
+//      { Concat, ::CVC4::api::BITVECTOR_CONCAT },
+//      // Indexed Op
+//      { Extract, ::CVC4::api::BITVECTOR_EXTRACT },
+//      { BVNot, ::CVC4::api::BITVECTOR_NOT },
+//      { BVNeg, ::CVC4::api::BITVECTOR_NEG },
+//      { BVAnd, ::CVC4::api::BITVECTOR_AND },
+//      { BVOr, ::CVC4::api::BITVECTOR_OR },
+//      { BVXor, ::CVC4::api::BITVECTOR_XOR },
+//      { BVNand, ::CVC4::api::BITVECTOR_NAND },
+//      { BVNor, ::CVC4::api::BITVECTOR_NOR },
+//      { BVXnor, ::CVC4::api::BITVECTOR_XNOR },
+//      { BVComp, ::CVC4::api::BITVECTOR_COMP },
+//      { BVAdd, ::CVC4::api::BITVECTOR_PLUS },
+//      { BVSub, ::CVC4::api::BITVECTOR_SUB },
+//      { BVMul, ::CVC4::api::BITVECTOR_MULT },
+//      { BVUdiv, ::CVC4::api::BITVECTOR_UDIV },
+//      { BVSdiv, ::CVC4::api::BITVECTOR_SDIV },
+//      { BVUrem, ::CVC4::api::BITVECTOR_UREM },
+//      { BVSrem, ::CVC4::api::BITVECTOR_SREM },
+//      { BVSmod, ::CVC4::api::BITVECTOR_SMOD },
+//      { BVShl, ::CVC4::api::BITVECTOR_SHL },
+//      { BVAshr, ::CVC4::api::BITVECTOR_ASHR },
+//      { BVLshr, ::CVC4::api::BITVECTOR_LSHR },
+//      { BVUlt, ::CVC4::api::BITVECTOR_ULT },
+//      { BVUle, ::CVC4::api::BITVECTOR_ULE },
+//      { BVUgt, ::CVC4::api::BITVECTOR_UGT },
+//      { BVUge, ::CVC4::api::BITVECTOR_UGE },
+//      { BVSlt, ::CVC4::api::BITVECTOR_SLT },
+//      { BVSle, ::CVC4::api::BITVECTOR_SLE },
+//      { BVSgt, ::CVC4::api::BITVECTOR_SGT },
+//      { BVSge, ::CVC4::api::BITVECTOR_SGE },
+//      // Indexed Op
+//      { Zero_Extend, ::CVC4::api::BITVECTOR_ZERO_EXTEND },
+//      // Indexed Op
+//      { Sign_Extend, ::CVC4::api::BITVECTOR_SIGN_EXTEND },
+//      // Indexed Op
+//      { Repeat, ::CVC4::api::BITVECTOR_REPEAT },
+//      // Indexed Op
+//      { Rotate_Left, ::CVC4::api::BITVECTOR_ROTATE_LEFT },
+//      // Indexed Op
+//      { Rotate_Right, ::CVC4::api::BITVECTOR_ROTATE_RIGHT },
+//      // Conversion
+//      { BV_To_Nat, ::CVC4::api::BITVECTOR_TO_NAT },
+//      // Indexed Op
+//      { Int_To_BV, ::CVC4::api::INT_TO_BITVECTOR },
+//      { Select, ::CVC4::api::SELECT },
+//      { Store, ::CVC4::api::STORE },
+//      { Forall, ::CVC4::api::FORALL },
+//      { Exists, ::CVC4::api::EXISTS },
+//      { Apply_Selector,::CVC4::api::APPLY_SELECTOR},
+//      { Apply_Tester,::CVC4::api::APPLY_TESTER},
+//      { Apply_Constructor,::CVC4::api::APPLY_CONSTRUCTOR}
+		});
+
 /* Z3Solver implementation */
 
 void Z3Solver::set_opt(const std::string option, const std::string value) {
@@ -165,7 +172,7 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 	SortKind sk = sort->get_sort_kind();
 
 	if (sk == BV) {
-		z_term = ctx.bv_const(val.c_str(), sort->get_width());	//why am i throwing out base?
+		z_term = ctx.bv_const(val.c_str(), sort->get_width());//why am i throwing out base?
 	} else if (sk == REAL) {
 		if (base != 10) {
 			throw NotImplementedException(
@@ -174,8 +181,14 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 
 		z_term = ctx.real_const(val.c_str());
 	} else if (sk == INT) {
-		int i = stoi(val);
-		z_term = ctx.int_val(i);	//ugh why is this jumping between val and const
+		if (base != 10) {
+			throw NotImplementedException(
+					"Does not support base not equal to 10.");
+		}
+//		int i = stoi(val);
+//		z_term = ctx.int_val(i);	//ugh why is this jumping between val and const
+
+		z_term = ctx.int_const(val.c_str());
 	} else {
 		string msg("Can't create value ");
 		msg += val;

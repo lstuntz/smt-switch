@@ -48,6 +48,11 @@ int main() {
 	cout << realterm << endl;
 	cout << bvterm << endl;
 
+	cout << "to int:" << endl;
+	cout << intterm->to_int() << endl;
+	cout << realterm->to_int() << endl;
+	cout << bvterm->to_int() << endl;
+
 	cout << "* * * end term testing * * *" << endl;
 
 	cout << "testing done :)" << endl;

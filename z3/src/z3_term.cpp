@@ -152,11 +152,13 @@ bool Z3TermIter::equal(const TermIterBase &other) const {
 // Z3Term implementation
 
 size_t Z3Term::hash() const {
-	throw NotImplementedException("hash not implemented for Z3 backend.");
+	return term.hash();
 }
 
 bool Z3Term::compare(const Term &absterm) const {
-	throw NotImplementedException("compare not implemented for Z3 backend.");
+//	throw NotImplementedException("compare not implemented for Z3 backend.");
+	std::shared_ptr<Z3Term> zs = std::static_pointer_cast < Z3Term > (absterm);
+	return term.hash() == (zs->term).hash();
 }
 
 Op Z3Term::get_op() const {
@@ -164,21 +166,19 @@ Op Z3Term::get_op() const {
 }
 
 Sort Z3Term::get_sort() const {
-	throw NotImplementedException("get_sort not implemented for Z3 backend.");
+	return std::make_shared < Z3Sort > (term.get_sort(), *ctx);
 }
 
 bool Z3Term::is_symbol() const {
-	throw NotImplementedException("is_symbol not implemented for Z3 backend.");
+	return (term.is_const() || term.is_var());
 }
 
 bool Z3Term::is_param() const {
-	throw NotImplementedException(
-			"Z3 backend does not support parameters yet.");
+	return term.is_var();
 }
 
 bool Z3Term::is_symbolic_const() const {
-	throw NotImplementedException(
-			"is_symbolic_const not implemented for Z3 backend.");
+	return (term.is_const() && !is_function);
 }
 
 bool Z3Term::is_value() const {
@@ -186,12 +186,37 @@ bool Z3Term::is_value() const {
 }
 
 string Z3Term::to_string() {
-	return const_to_string();
-//	throw NotImplementedException("to_string not implemented for Z3 backend.");
+	return term.to_string();
+//	return const_to_string();		// I don't think I put this here? is this better than just to_stinrg?
 }
 
 uint64_t Z3Term::to_int() const {
-	throw NotImplementedException("to_int not implemented for Z3 backend.");
+//	throw NotImplementedException("to_int not implemented for Z3 backend.");
+
+	std::string val = term.to_string();
+
+	// Process bit-vector format.
+	if (term.is_bv()) {
+		if (val.find("#x") == std::string::npos) {
+			std::string msg = val;
+			msg += " is not a constant term, can't convert to int.";
+			throw IncorrectUsageException(msg.c_str());
+		}
+		// SOMETHING WONKY THIS WAY COMES ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !
+		val = val.substr(3, val.length());
+		val = val.substr(0, val.find(" "));
+
+	}
+
+	// If not bit-vector, try parsing an int from the term.
+	try {
+		return std::stoi(val);
+	} catch (std::exception const &e) {
+		std::string msg("Term ");
+		msg += val;
+		msg += " does not contain an integer representable by a machine int.";
+		throw IncorrectUsageException(msg.c_str());
+	}
 }
 
 TermIter Z3Term::begin() {
@@ -203,13 +228,17 @@ TermIter Z3Term::end() {
 }
 
 std::string Z3Term::print_value_as(SortKind sk) {
-	throw NotImplementedException(
-			"print_value_as not implemented for Z3 backend.");
+	if (!is_value())
+	  {
+	    throw IncorrectUsageException(
+	        "Cannot use print_value_as on a non-value term.");
+	  }
+	  return term.to_string();
 }
 
-string Z3Term::const_to_string() const {
-	return term.to_string();
-}
+//string Z3Term::const_to_string() const {
+//	return term.to_string();
+//}
 
 // end Z3Term implementation
 

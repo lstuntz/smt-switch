@@ -58,8 +58,10 @@ private:
 class Z3Term: public AbsTerm {
 public:
 	// assumes that term is not a function if flag is not passed
-   Z3Term(expr t) : term(t), is_function(false){};
-   Z3Term(expr t, bool is_fun) : term(t), is_function(is_fun){};
+   Z3Term(expr t, context &c) : term(t), is_function(false){
+	   ctx = &c;
+   };
+   Z3Term(expr t, bool is_fun, context &c) : term(t), is_function(is_fun){};
 	~Z3Term() {
 	}
 	;
@@ -81,6 +83,7 @@ public:
 protected:
 	expr term;
 	bool is_function;
+	context *ctx;
 
 	// a const version of to_string
 	// the main to_string can't be const so that LoggingSolver

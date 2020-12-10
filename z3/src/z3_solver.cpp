@@ -100,7 +100,7 @@ Term Z3Solver::make_term(bool b) const {
 		z_term = ctx.bool_val(true);
 	}
 
-	return std::make_shared < Z3Term > (z_term);
+	return std::make_shared < Z3Term > (z_term, ctx);
 }
 
 Sort Z3Solver::make_sort(const DatatypeDecl &d) const {
@@ -163,7 +163,7 @@ Term Z3Solver::make_term(int64_t i, const Sort &sort) const {
 		throw IncorrectUsageException(msg);
 	}
 
-	return std::make_shared < Z3Term > (z_term);
+	return std::make_shared < Z3Term > (z_term, ctx);
 }
 
 Term Z3Solver::make_term(const std::string val, const Sort &sort,
@@ -197,7 +197,7 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 		throw IncorrectUsageException(msg);
 	}
 
-	return std::make_shared < Z3Term > (z_term);
+	return std::make_shared < Z3Term > (z_term, ctx);
 }
 
 Term Z3Solver::make_term(const Term &val, const Sort &sort) const {

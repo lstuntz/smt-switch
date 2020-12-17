@@ -148,13 +148,13 @@ Term Z3Solver::get_selector(const Sort &s, std::string con,
 
 Term Z3Solver::make_term(int64_t i, const Sort &sort) const {
 	SortKind sk = sort->get_sort_kind();
-	expr z_term = ctx.bool_val(true);	//change me
+	expr z_term = expr(ctx);
 	if (sk == INT) {
 		z_term = ctx.int_val(i);
 	} else if (sk == REAL) {
 		z_term = ctx.real_val(i);
 	} else if (sk == BV) {
-		z_term = ctx.bv_val(sort->get_width(), i);//why did yices use const here
+		z_term = ctx.bv_val(sort->get_width(), i); //why did yices use const here
 	} else {
 		string msg("Can't create value ");
 		msg += i;
@@ -168,11 +168,11 @@ Term Z3Solver::make_term(int64_t i, const Sort &sort) const {
 
 Term Z3Solver::make_term(const std::string val, const Sort &sort,
 		uint64_t base) const {
-	expr z_term = ctx.bool_val(true);	//change me
+	expr z_term = expr(ctx);
 	SortKind sk = sort->get_sort_kind();
 
-	if (sk == BV) {
-		z_term = ctx.bv_const(val.c_str(), sort->get_width());//why am i throwing out base?
+	if (sk == BV) {       //sort width or base??
+		z_term = ctx.bv_const(val.c_str(), sort->get_width()); //why am i throwing out base?
 	} else if (sk == REAL) {
 		if (base != 10) {
 			throw NotImplementedException(
@@ -203,6 +203,13 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 Term Z3Solver::make_term(const Term &val, const Sort &sort) const {
 	throw NotImplementedException(
 			"Constant arrays not supported for Z3 backend.");
+
+//	std::shared_ptr < Z3Term > zterm = std::static_pointer_cast < Z3Term
+//			> (val);
+//	std::shared_ptr < Z3Sort > zsort = std::static_pointer_cast < Z3Sort
+//			> (sort);
+//	::CVC4::api::Term const_arr = solver.mkConstArray(zsort->sort, zterm->term);
+//	return std::make_shared < CVC4Term > (const_arr);
 }
 
 void Z3Solver::assert_formula(const Term &t) {

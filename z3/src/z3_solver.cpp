@@ -201,15 +201,24 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 }
 
 Term Z3Solver::make_term(const Term &val, const Sort &sort) const {
-	throw NotImplementedException(
-			"Constant arrays not supported for Z3 backend.");
 
-//	std::shared_ptr < Z3Term > zterm = std::static_pointer_cast < Z3Term
-//			> (val);
-//	std::shared_ptr < Z3Sort > zsort = std::static_pointer_cast < Z3Sort
-//			> (sort);
+	std::shared_ptr < Z3Term > zterm = std::static_pointer_cast < Z3Term
+			> (val);
+	std::shared_ptr < Z3Sort > zsort = std::static_pointer_cast < Z3Sort
+			> (sort);
 //	::CVC4::api::Term const_arr = solver.mkConstArray(zsort->sort, zterm->term);
-//	return std::make_shared < CVC4Term > (const_arr);
+
+
+//	**** Z3_mk_const_array (Z3_context c, Z3_sort domain, Z3_ast v)
+
+//	Z3_context c_ctx = Z3_mk_context(Z3_mk_config());
+//	Z3_sort c_sort = Z3_mk_bool_sort(c_ctx);
+//	Z3_ast c_ast = Z3_mk_true (c_ctx);
+
+	// doesn't check if sort is_function -- if yes, this will seg fault
+	Z3_ast c_array = Z3_mk_const_array(ctx, zsort->type, zterm->term);
+	expr final = expr(ctx, c_array);
+	return std::make_shared < Z3Term > (final, ctx);
 }
 
 void Z3Solver::assert_formula(const Term &t) {

@@ -11,76 +11,60 @@ using namespace std;
 
 namespace smt {
 
-/* CVC4 Op mappings */
-const std::unordered_map<PrimOp, Z3_decl_kind> primop2kind( {
-		{ And, Z3_OP_AND }, { Or, Z3_OP_OR }, { Xor, Z3_OP_XOR }, { Not,
-				Z3_OP_NOT }, { Implies, Z3_OP_IMPLIES }, { Ite, Z3_OP_ITE }, {
-				Iff, Z3_OP_IFF }, { Equal, Z3_OP_EQ }, { Distinct,
-				Z3_OP_DISTINCT },
-//      /* Uninterpreted Functions */
-//      { Apply, ::CVC4::api::APPLY_UF },
-		/* Arithmetic Theories */
-		{ Plus, Z3_OP_ADD }, { Minus, Z3_OP_SUB }, { Negate, Z3_OP_UMINUS }, {
-				Mult, Z3_OP_MUL }, { Div, Z3_OP_DIV }, { IntDiv, Z3_OP_IDIV }, {
-				Lt, Z3_OP_LT }, { Le, Z3_OP_LE }, { Gt, Z3_OP_GT }, { Ge,
-				Z3_OP_GE }, { Mod, Z3_OP_MOD },
-//      { Abs, ::CVC4::api::ABS },
-		{ Pow, Z3_OP_POWER }, { To_Real, Z3_OP_TO_REAL },
-		{ To_Int, Z3_OP_TO_INT }, { Is_Int, Z3_OP_IS_INT },
-//      /* Fixed Size BitVector Theory */
-//      { Concat, ::CVC4::api::BITVECTOR_CONCAT },
-//      // Indexed Op
-//      { Extract, ::CVC4::api::BITVECTOR_EXTRACT },
-//      { BVNot, ::CVC4::api::BITVECTOR_NOT },
-//      { BVNeg, ::CVC4::api::BITVECTOR_NEG },
-//      { BVAnd, ::CVC4::api::BITVECTOR_AND },
-//      { BVOr, ::CVC4::api::BITVECTOR_OR },
-//      { BVXor, ::CVC4::api::BITVECTOR_XOR },
-//      { BVNand, ::CVC4::api::BITVECTOR_NAND },
-//      { BVNor, ::CVC4::api::BITVECTOR_NOR },
-//      { BVXnor, ::CVC4::api::BITVECTOR_XNOR },
-//      { BVComp, ::CVC4::api::BITVECTOR_COMP },
-//      { BVAdd, ::CVC4::api::BITVECTOR_PLUS },
-//      { BVSub, ::CVC4::api::BITVECTOR_SUB },
-//      { BVMul, ::CVC4::api::BITVECTOR_MULT },
-//      { BVUdiv, ::CVC4::api::BITVECTOR_UDIV },
-//      { BVSdiv, ::CVC4::api::BITVECTOR_SDIV },
-//      { BVUrem, ::CVC4::api::BITVECTOR_UREM },
-//      { BVSrem, ::CVC4::api::BITVECTOR_SREM },
-//      { BVSmod, ::CVC4::api::BITVECTOR_SMOD },
-//      { BVShl, ::CVC4::api::BITVECTOR_SHL },
-//      { BVAshr, ::CVC4::api::BITVECTOR_ASHR },
-//      { BVLshr, ::CVC4::api::BITVECTOR_LSHR },
-//      { BVUlt, ::CVC4::api::BITVECTOR_ULT },
-//      { BVUle, ::CVC4::api::BITVECTOR_ULE },
-//      { BVUgt, ::CVC4::api::BITVECTOR_UGT },
-//      { BVUge, ::CVC4::api::BITVECTOR_UGE },
-//      { BVSlt, ::CVC4::api::BITVECTOR_SLT },
-//      { BVSle, ::CVC4::api::BITVECTOR_SLE },
-//      { BVSgt, ::CVC4::api::BITVECTOR_SGT },
-//      { BVSge, ::CVC4::api::BITVECTOR_SGE },
-//      // Indexed Op
-//      { Zero_Extend, ::CVC4::api::BITVECTOR_ZERO_EXTEND },
-//      // Indexed Op
-//      { Sign_Extend, ::CVC4::api::BITVECTOR_SIGN_EXTEND },
-//      // Indexed Op
-//      { Repeat, ::CVC4::api::BITVECTOR_REPEAT },
-//      // Indexed Op
-//      { Rotate_Left, ::CVC4::api::BITVECTOR_ROTATE_LEFT },
-//      // Indexed Op
-//      { Rotate_Right, ::CVC4::api::BITVECTOR_ROTATE_RIGHT },
-//      // Conversion
-//      { BV_To_Nat, ::CVC4::api::BITVECTOR_TO_NAT },
-//      // Indexed Op
-//      { Int_To_BV, ::CVC4::api::INT_TO_BITVECTOR },
-//      { Select, ::CVC4::api::SELECT },
-//      { Store, ::CVC4::api::STORE },
-//      { Forall, ::CVC4::api::FORALL },
-//      { Exists, ::CVC4::api::EXISTS },
-//      { Apply_Selector,::CVC4::api::APPLY_SELECTOR},
-//      { Apply_Tester,::CVC4::api::APPLY_TESTER},
-//      { Apply_Constructor,::CVC4::api::APPLY_CONSTRUCTOR}
-		});
+/* Z3 Op mappings */
+typedef Z3_ast (*un_fun)(Z3_context c, Z3_ast a);
+typedef Z3_ast (*bin_fun)(Z3_context c, Z3_ast t1, Z3_ast t2);
+typedef Z3_ast (*tern_fun)(Z3_context c, Z3_ast t1, Z3_ast t2, Z3_ast t3);
+typedef Z3_ast (*variadic_fun)(Z3_context c, unsigned num, Z3_ast const args[]);
+
+const std::unordered_map<PrimOp, un_fun> unary_ops(
+		{ 	{ Not, Z3_mk_not },
+			{ Negate, Z3_mk_unary_minus },		//is this okay here?
+			{ Abs, Z3_mk_fpa_abs  },			// is it okay that the next several are fpa?
+			{ To_Real, Z3_mk_fpa_to_real  },
+			{ To_Int, Z3_mk_str_to_int },	//do i want str to int??
+			{ Is_Int, Z3_mk_is_int  },
+			{ BVNot, Z3_mk_bvnot },
+			{ BVNeg, Z3_mk_bvneg } });
+
+const unordered_map<PrimOp, bin_fun> binary_ops(
+    { { Xor, Z3_mk_xor },          	{ Implies, Z3_mk_implies },
+      { Iff, Z3_mk_iff },           { Pow, Z3_mk_power },
+      { Div, Z3_mk_div },      		{ Lt, Z3_mk_lt },
+      { To_Int, Z3_mk_fpa_round_to_integral },	 	{ Le, Z3_mk_le },
+      { Gt, Z3_mk_gt },  			{ Ge, Z3_mk_ge },
+      { Equal, Z3_mk_eq },          { Mod, Z3_mk_mod },
+      { Concat, Z3_mk_concat },  	{ BVAnd, Z3_mk_bvand },
+      { BVOr, Z3_mk_bvor },        	{ BVXor, Z3_mk_bvxor },
+      { BVNand, Z3_mk_bvnand },     { BVNor, Z3_mk_bvnor },
+      { BVXnor, Z3_mk_bvxnor },     { BVAdd, Z3_mk_bvadd },
+      { BVSub, Z3_mk_bvsub },       { BVMul, Z3_mk_bvmul },
+      { BVUdiv, Z3_mk_bvudiv },     { BVUrem, Z3_mk_bvurem },
+      { BVSdiv, Z3_mk_bvsdiv },     { BVSrem, Z3_mk_bvsrem },
+      { BVSmod, Z3_mk_bvsmod },     { BVShl, Z3_mk_bvshl },
+      { BVAshr, Z3_mk_bvashr },     { BVLshr, Z3_mk_bvlshr },
+      { BVUlt, Z3_mk_bvult },   	{ BVUle, Z3_mk_bvule },
+      { BVUgt, Z3_mk_bvugt },   	{ BVUge, Z3_mk_bvuge },
+      { BVSle, Z3_mk_bvsle },  		{ BVSlt, Z3_mk_bvslt },
+      { BVSge, Z3_mk_bvsge }, 	 	{ BVSgt, Z3_mk_bvsgt },
+      { Rotate_Left, Z3_mk_ext_rotate_left }, 	 	{ Rotate_Right, Z3_mk_ext_rotate_right },
+      { Select, Z3_mk_select },
+
+    });
+
+const unordered_map<PrimOp, tern_fun> ternary_ops(
+    { { Ite, Z3_mk_ite },
+      { Store, Z3_mk_store }
+    });
+
+const unordered_map<PrimOp, variadic_fun> variadic_ops({
+    { And, Z3_mk_and },
+    { Or, Z3_mk_or},
+	{ Plus, Z3_mk_add },
+	{ Minus, Z3_mk_sub },
+	{ Mult, Z3_mk_mul },
+    { Distinct, Z3_mk_distinct },
+	});
 
 /* Z3Solver implementation */
 
@@ -202,22 +186,17 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 
 Term Z3Solver::make_term(const Term &val, const Sort &sort) const {
 
-	std::shared_ptr < Z3Term > zterm = std::static_pointer_cast < Z3Term
-			> (val);
-	std::shared_ptr < Z3Sort > zsort = std::static_pointer_cast < Z3Sort
-			> (sort);
-//	::CVC4::api::Term const_arr = solver.mkConstArray(zsort->sort, zterm->term);
-
+	std::shared_ptr<Z3Term> zterm = std::static_pointer_cast < Z3Term > (val);
+	std::shared_ptr<Z3Sort> zsort = std::static_pointer_cast < Z3Sort > (sort);
 
 //	**** Z3_mk_const_array (Z3_context c, Z3_sort domain, Z3_ast v)
 
-//	Z3_context c_ctx = Z3_mk_context(Z3_mk_config());
-//	Z3_sort c_sort = Z3_mk_bool_sort(c_ctx);
-//	Z3_ast c_ast = Z3_mk_true (c_ctx);
+	if (zsort->is_function) {
+		throw IncorrectUsageException("no functions in arrays ? ? ? ?");
+	}
 
-	// doesn't check if sort is_function -- if yes, this will seg fault
 	Z3_ast c_array = Z3_mk_const_array(ctx, zsort->type, zterm->term);
-	expr final = expr(ctx, c_array);
+	expr final = to_expr(ctx, c_array);
 	return std::make_shared < Z3Term > (final, ctx);
 }
 
@@ -388,8 +367,40 @@ Sort Z3Solver::make_sort(const Sort &sort_con, const SortVec &sorts) const {
 }
 
 Term Z3Solver::make_symbol(const std::string name, const Sort &sort) {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	shared_ptr < Z3Sort > zsort = static_pointer_cast < Z3Sort > (sort);
+	const char *c = name.c_str();
+	z3::symbol z_name = ctx.str_symbol(c);
+	Z3_ast z_sym;
+
+	if (zsort->get_sort_kind() == FUNCTION) {
+		// nb this is creating a func_decl
+
+		sort_vector sorts(ctx);
+		sorts.push_back(ctx.bool_sort());
+		sorts.push_back(ctx.bool_sort());
+
+		std::vector<z3::sort> zsorts;
+		zsorts.reserve(2);
+		zsorts.push_back(ctx.bool_sort());
+		zsorts.push_back(ctx.bool_sort());
+
+		z3::sort i_ex = ctx.int_sort();
+		func_decl z_func = ctx.function(c, sorts, i_ex);
+		z_sym = to_func_decl(ctx, z_func);
+		cout << z_func.arity() << endl;
+
+//		z_sym = ctx.function(z_name, zsort->z_func.arity(), zsort->z_func.domain(1), zsort->z_func.range());
+
+		return std::make_shared<Z3Term> (z_func, ctx);
+	} else {
+		// nb this is creating an expr
+		expr z_term = ctx.constant(z_name, zsort->type);
+		z_sym = to_expr(ctx, z_term);
+
+		return std::make_shared<Z3Term> (z_term, ctx);
+	}
+
+//	return std::make_shared<Z3Term> (z_sym, ctx);
 }
 
 Term Z3Solver::make_param(const std::string name, const Sort &sort) {
@@ -397,24 +408,290 @@ Term Z3Solver::make_param(const std::string name, const Sort &sort) {
 }
 
 Term Z3Solver::make_term(Op op, const Term &t) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+
+	shared_ptr<Z3Term> zterm = static_pointer_cast < Z3Term > (t);
+	Z3_ast res;
+
+	if (op.prim_op == Extract) {
+		if (op.idx0 < 0 || op.idx1 < 0) {
+			throw IncorrectUsageException(
+					"Can't have negative number in extract");
+		}
+		res = Z3_mk_extract(ctx, op.idx1, op.idx0, zterm->term);
+	} else if (op.prim_op == Zero_Extend) {
+		if (op.idx0 < 0) {
+			throw IncorrectUsageException(
+					"Can't zero extend by negative number");
+		}
+		res = Z3_mk_zero_ext(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == Sign_Extend) {
+		if (op.idx0 < 0) {
+			throw IncorrectUsageException(
+					"Can't sign extend by negative number");
+		}
+		res = Z3_mk_sign_ext(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == Repeat) {
+		if (op.num_idx < 1) {
+			throw IncorrectUsageException("Can't create repeat with index < 1");
+		}
+		res = Z3_mk_repeat(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == Rotate_Left) {
+		if (op.idx0 < 0) {
+			throw IncorrectUsageException("Can't rotate by negative number");
+		}
+		res = Z3_mk_rotate_left(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == Rotate_Right) {
+		if (op.idx0 < 0) {
+			throw IncorrectUsageException("Can't rotate by negative number");
+		}
+		res = Z3_mk_rotate_right(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == Int_To_BV) {
+		if (op.idx0 < 0) {
+			throw IncorrectUsageException(
+					"Can't have negative width in Int_To_BV op");
+		}
+		res = Z3_mk_int2bv(ctx, op.idx0, zterm->term);
+	} else if (op.prim_op == BV_To_Nat) {
+//	  	    if (op.idx0 < 0)
+//	  	    {
+//	  	      throw IncorrectUsageException(
+//	  	          "Can't have negative width in Int_To_BV op");
+//	  	    }
+		res = Z3_mk_bv2int(ctx, zterm->term, false);
+
+		//return here or it will go into "not supported" message
+	}
+
+	else if (!op.num_idx) {
+		if (unary_ops.find(op.prim_op) != unary_ops.end()) {
+//			res = to_expr(ctx, unary_ops.at(op.prim_op)(ctx, zterm->term));
+			res = unary_ops.at(op.prim_op)(ctx, zterm->term);
+		} else {
+			string msg("Can't apply ");
+			msg += op.to_string();
+			msg += " to the term or not supported by Z3 backend yet.";
+			throw IncorrectUsageException(msg);
+		}
+	} else {
+		string msg = op.to_string();
+		msg += " not supported for one term argument";
+		throw IncorrectUsageException(msg);
+	}
+
+	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 }
 
 Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	shared_ptr<Z3Term> zterm0 = static_pointer_cast < Z3Term > (t0);
+	shared_ptr<Z3Term> zterm1 = static_pointer_cast < Z3Term > (t1);
+//	expr res = expr(ctx);
+	Z3_ast res;
+
+	if (!op.num_idx) {
+		if (binary_ops.find(op.prim_op) != binary_ops.end()) {
+			res = binary_ops.at(op.prim_op)(ctx, zterm0->term, zterm1->term);
+		} else if (variadic_ops.find(op.prim_op) != variadic_ops.end()) {
+			Z3_ast terms[2] = { zterm0->term, zterm1->term };
+			res = variadic_ops.at(op.prim_op)(ctx, 2, terms);
+		} else {
+			string msg("Can't apply ");
+			msg += op.to_string();
+			msg += " to the term or not supported by Z3 backend yet.";
+			throw IncorrectUsageException(msg);
+		}
+	} else {
+		string msg = op.to_string();
+		msg += " not supported for two term argument";
+		throw IncorrectUsageException(msg);
+	}
+
+	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 }
 
 Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1,
 		const Term &t2) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	shared_ptr<Z3Term> zterm0 = static_pointer_cast < Z3Term > (t0);
+	shared_ptr<Z3Term> zterm1 = static_pointer_cast < Z3Term > (t1);
+	shared_ptr<Z3Term> zterm2 = static_pointer_cast < Z3Term > (t2);
+	Z3_ast res;
+
+	if (!op.num_idx) {
+		if (ternary_ops.find(op.prim_op) != ternary_ops.end()) {
+			res = ternary_ops.at(op.prim_op)(ctx, zterm0->term, zterm1->term,
+					zterm2->term);
+		} else if (variadic_ops.find(op.prim_op) != variadic_ops.end()) {
+			Z3_ast terms[3] = { zterm0->term, zterm1->term, zterm2->term };
+			res = variadic_ops.at(op.prim_op)(ctx, 3, terms);
+//		}
+//		// TODO: Threw this is for term traversal, but it's not a fix.
+//		// Need to handle all "variadic" Ops this way with proper L/R association.
+//		else if (op.prim_op == Plus) {
+//			res = yices_add(yterm0->term,
+//					yices_add(yterm1->term, yterm2->term));
+		} else {
+			string msg("Can't apply ");
+			msg += op.to_string();
+			msg += " to three terms, or not supported by Z3 backend yet.";
+			throw IncorrectUsageException(msg);
+		}
+	} else {
+		string msg = op.to_string();
+		msg += " not supported for three term arguments";
+		throw IncorrectUsageException(msg);
+	}
+	if (zterm0->is_function && op.prim_op == Apply) {
+		Z3_ast args[2];
+		args[0] = zterm1->term;
+		args[1] = zterm2->term;
+		res = Z3_mk_app(ctx, zterm0->z_func, 2, args);
+		//is an application a function itself??
+//		return std::make_shared < Yices2Term > (to_expr(ctx, res), ctx);
+	} //else {
+	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
+//	}
 }
 
 Term Z3Solver::make_term(Op op, const TermVec &terms) const {
-	throw NotImplementedException(
-			"Term iteration not implemented for Z3 backend.");
+	size_t size = terms.size();
+	Z3_ast res;
+//	if (!size) {
+//		string msg("Can't apply ");
+//		msg += op.to_string();
+//		msg += " to zero terms.";
+//		throw IncorrectUsageException(msg);
+//	} else if (size == 1) {
+//		return make_term(op, terms[0]);
+//	} else if (size == 2) {
+//		return make_term(op, terms[0], terms[1]);
+//	} else if (size == 3) {
+//		return make_term(op, terms[0], terms[1], terms[2]);
+//	}
+//	} else if (op.prim_op == Apply) {
+//		vector < Z3_ast > zargs;
+//		zargs.reserve(size);
+//		shared_ptr < Z3Term > zterm;
+//
+//		// skip the first term (that's actually a function)
+//		for (size_t i = 1; i < terms.size(); i++) {
+//			zterm = static_pointer_cast < Z3Term > (ctx, terms[i]);
+//			zargs.push_back(zterm->term);
+//		}
+//
+//		zterm = static_pointer_cast < Z3Term > (terms[0]);
+//		if (!zterm->is_function)) {
+//			string msg(
+//					"Expecting an uninterpreted function to be used with Apply but got ");
+//			msg += terms[0]->to_string();
+//			throw IncorrectUsageException(msg);
+//		}
+//
+//		res = Z3_mk_app(ctx, zterm->z_func, size - 1, &zargs[0]);
+//	}
+
+	if (op.prim_op == Forall || op.prim_op == Exists) {
+		std::vector<expr> zterms;
+		zterms.reserve(terms.size());
+		std::shared_ptr<Z3Term> zterm;
+		for (auto t : terms) {
+			zterm = std::static_pointer_cast<Z3Term>(t);
+			zterms.push_back(zterm->term);
+		}
+		if (zterms.size() != 2){
+			throw IncorrectUsageException(
+		            "smt-switch only supports binding one parameter at a time with a "
+		            "quantifier");
+		}
+		expr quantified_body = zterms.back();
+		zterms.pop_back();
+		unsigned num_var = zterms.size();	// this will always be one
+
+		// slightly redundant for one elem list, but good for later
+		// also kinda redundant to create new list from zterms, but c'est la vie
+		std::vector<Z3_ast> znames;
+		znames.reserve(terms.size() - 1);
+		std::vector<Z3_sort> zsorts;
+		zsorts.reserve(terms.size() - 1);
+		for (auto t : zterms){
+			znames.push_back(t);
+		}
+		for (auto t : znames) {
+			zsorts.push_back(Z3_get_sort(ctx, t));
+		}
+		cout << "names: ";
+		for (auto n : znames) { cout << to_expr(ctx, n) << " "; }
+		cout << endl << "sorts: ";
+		for (auto s : zsorts) { cout << to_sort(ctx, s) << " "; }
+		cout << endl << "body: " << quantified_body << endl;
+		cout << "num var: " << num_var << endl;
+
+		Z3_ast const nn[] = { znames[0] };
+		Z3_sort const ss[] = { zsorts[0] };
+
+		expr t0 = zterms[0];
+//		zterm = std::static_pointer_cast<Z3Term>(t0);
+		const char *c = (t0.to_string()).c_str();//name.c_str();
+		Z3_symbol const sym[] = { ctx.str_symbol(c) };
+		cout << "!! - " << c << endl;
+
+		if (op.prim_op == Forall){
+			res = Z3_mk_forall(ctx, 0, 0, NULL, num_var, ss, sym, quantified_body);
+		}
+		if (op.prim_op == Exists){
+			res = Z3_mk_exists(ctx, 0, 0, NULL, num_var, ss, sym, quantified_body);
+		}
+		cout << ":)" << endl;
+		expr res2 = to_expr(ctx, res);
+		cout << ":)" << endl;
+		return std::make_shared < Z3Term > (res2, ctx);
+//		return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
+	}
+//	std::vector<expr> zterms;
+//	zterms.reserve(terms.size());
+//	std::shared_ptr<Z3Term> zterm;
+//
+//	expr quantified_body = zterms.back();
+//	zterms.pop_back();
+////	expr bound_vars = solver.mkTerm(CVC4::api::BOUND_VAR_LIST, cterms);
+//	unsigned var = 0;//num var
+//	z3::sort sorts[] = {};
+//	func_decl names[] = {};
+
+//	if (op.prim_op == Forall) {
+//		throw IncorrectUsageException("nope");
+//
+//		//(Z3_context c, unsigned weight, unsigned num_patterns,
+//			//Z3_pattern const patterns[], unsigned num_decls,
+//			//Z3_sort const sorts[], Z3_symbol const decl_names[],
+//			//Z3_ast body)
+////		res = Z3_mk_forall(ctx, 0, 0, NULL, var, sorts, names, quantified_body);
+//	} else if (op.prim_op == Exists) {
+//		throw IncorrectUsageException("nope");
+//	}
+
+	if (!size) {
+		string msg("Can't apply ");
+		msg += op.to_string();
+		msg += " to zero terms.";
+		throw IncorrectUsageException(msg);
+	} else if (size == 1) {
+		return make_term(op, terms[0]);
+	} else if (size == 2) {
+		return make_term(op, terms[0], terms[1]);
+	} else if (size == 3) {
+		return make_term(op, terms[0], terms[1], terms[2]);
+	}
+
+	// else if() ... check the variadic terms list.
+	else {
+		string msg("Can't apply ");
+		msg += op.to_string();
+		msg += " to ";
+		msg += ::std::to_string(size);
+		msg += " terms.";
+		throw IncorrectUsageException(msg);
+	}
+
+	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 }
 
 void Z3Solver::reset() {

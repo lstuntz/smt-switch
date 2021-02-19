@@ -57,11 +57,12 @@ private:
 
 class Z3Term: public AbsTerm {
 public:
-	// assumes that term is not a function if flag is not passed
-   Z3Term(expr t, context &c) : term(t), is_function(false){
+	// Non-functions
+   Z3Term(expr t, context &c) : term(t), is_function(false), z_func(c) {
 	   ctx = &c;
    };
-   Z3Term(expr t, bool is_fun, context &c) : term(t), is_function(is_fun){};
+   // Functions
+   Z3Term(func_decl zfunc, context &c) : term(c), is_function(true), z_func(zfunc) {};
 	~Z3Term() {
 	}
 	;
@@ -82,6 +83,7 @@ public:
 
 protected:
 	expr term;
+	func_decl z_func;
 	bool is_function;
 	context *ctx;
 

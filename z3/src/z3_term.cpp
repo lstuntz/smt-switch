@@ -187,7 +187,6 @@ bool Z3Term::is_value() const {
 
 string Z3Term::to_string() {
 	return term.to_string();
-//	return const_to_string();		// I don't think I put this here? is this better than just to_stinrg?
 }
 
 uint64_t Z3Term::to_int() const {

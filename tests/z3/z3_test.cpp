@@ -66,13 +66,17 @@ int main() {
 	context c;
 	expr bv_const_test = c.bv_const("bv!", 8);
 	expr bv_val_test = c.bv_val("2", 8);
+	expr constx = c.constant("x", c.bool_sort());
 
 	cout << "const:  " << bv_const_test << endl;
 	cout << "val:  " << bv_val_test << endl;
 	cout << "c - c  " << bv_const_test.is_const() << endl;
 	cout << "c - n  " << bv_const_test.is_numeral() << endl;
+	cout << "c - v  " << bv_const_test.is_var() << endl;
 	cout << "v - c  " << bv_val_test.is_const() << endl;
 	cout << "v - n  " << bv_val_test.is_numeral() << endl;
+	cout << "c - v  " << bv_val_test.is_var() << endl;
+	cout << "x - v  " << constx.is_var() << endl;
 
 	cout << "testing done :)" << endl;
 
@@ -113,9 +117,19 @@ int main() {
 	Z3_ast a0 = Z3_mk_extract(a.ctx(),3,0,a);
 	Z3_ast a1 = Z3_mk_extract(a.ctx(),3,0,c.bv_val("2", 8));
 	expr a00 = to_expr(c, a0);
-//	expr a11 = to_expr(c, a1);
+	expr a11 = to_expr(c, a1);
 	cout << a00 << endl ;//<< a11 << endl << " *" << endl;
 
+	Sort bvsort2 = s->make_sort(BV, 8);
+	Term bvterm2 = s->make_term("x", bvsort2);
+	Term aext = s->make_term(Op(Extract, 3, 0), bvterm2);
+	cout << "! ! ! ! ! ! ! ! ! ! ! " << aext << endl;
+
+	Term bv2nat = s->make_term(Op(BV_To_Nat), bvterm);
+	Term int2bv = s->make_term(Op(Int_To_BV, 8), intterm);
+
+	cout << bv2nat << endl;
+	cout << int2bv << endl;
 
 	Z3_ast zbv1 = Z3_mk_zero_ext(c, 1, bv_const_test);
 	cout << to_expr(c, zbv1) << endl;
@@ -128,6 +142,10 @@ int main() {
 	cout << "function exploration: " << endl;
 	cout << functionsort << endl;
 	Term funfun = s->make_symbol("hellooo", functionsort);
+	cout << ":)" << endl << funfun << endl;
+
+	Term appfun = s->make_term(Op(Apply), TermVec{ funfun, boolterm1, intterm, realterm });
+	cout << appfun << endl;
 
 	cout << " * * * " << endl;
 	TermVec ts = { intterm, bvterm };
@@ -139,25 +157,17 @@ int main() {
 	printVec("ts later", ts);
 
 	Term x = s->make_symbol("x", boolsort1);
-	Term impx = s->make_term(Implies, x, x);
+	Term y = s->make_symbol("y", boolsort1);
+	Term impx = s->make_term(Implies, x, y);
 	cout << x << endl;
+	cout << y << endl;
 	cout << impx << endl;
 
+	cout << "*" << endl;
 	Term qterm =  s->make_term(Forall, TermVec{ x, impx });
 	cout << qterm << endl;
 
 	cout << "**" << endl;
-
-//	string ss[] = { "hi" };
-//	for (auto s : ss){
-//		cout << s << "  ";
-//	}
-//	cout << endl;
-//	ss.insert(1, "hello");
-//	for (auto s : ss) {
-//		cout << s << "  ";
-//	}
-//	cout << endl;
 
 	return 0;
 }

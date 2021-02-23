@@ -152,17 +152,26 @@ bool Z3TermIter::equal(const TermIterBase &other) const {
 // Z3Term implementation
 
 size_t Z3Term::hash() const {
+	if (is_function) {
+		return term.hash();
+	} else {
+		return z_func.hash();
+	}
 	return term.hash();
 }
 
 bool Z3Term::compare(const Term &absterm) const {
-//	throw NotImplementedException("compare not implemented for Z3 backend.");
 	std::shared_ptr<Z3Term> zs = std::static_pointer_cast < Z3Term > (absterm);
-	return term.hash() == (zs->term).hash();
+	if (is_function && zs->is_function) {
+		return z_func.hash() == (zs->z_func).hash();
+	} else if (!is_function && !zs->is_function) {
+		return term.hash() == (zs->term).hash();
+	}
+	return false;
 }
 
 Op Z3Term::get_op() const {
-	throw NotImplementedException("get_op not implemented for Z3 backend.");
+	throw NotImplementedException("get_op not yet implemented.");
 }
 
 Sort Z3Term::get_sort() const {
@@ -186,11 +195,14 @@ bool Z3Term::is_value() const {
 }
 
 string Z3Term::to_string() {
-	return term.to_string();
+	if (is_function) {
+		return z_func.to_string();
+	} else {
+		return term.to_string();
+	}
 }
 
 uint64_t Z3Term::to_int() const {
-//	throw NotImplementedException("to_int not implemented for Z3 backend.");
 
 	std::string val = term.to_string();
 

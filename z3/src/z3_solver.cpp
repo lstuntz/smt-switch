@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include <z3++.h>
-// #include "z3_extensions.h"
 
 using namespace std;
 
@@ -19,10 +18,10 @@ typedef Z3_ast (*variadic_fun)(Z3_context c, unsigned num, Z3_ast const args[]);
 
 const std::unordered_map<PrimOp, un_fun> unary_ops(
 		{ 	{ Not, Z3_mk_not },
-			{ Negate, Z3_mk_unary_minus },		//is this okay here?
-			{ Abs, Z3_mk_fpa_abs  },			// is it okay that the next several are fpa?
+			{ Negate, Z3_mk_unary_minus },
+			{ Abs, Z3_mk_fpa_abs  },
 			{ To_Real, Z3_mk_fpa_to_real  },
-			{ To_Int, Z3_mk_str_to_int },	//do i want str to int??
+			{ To_Int, Z3_mk_str_to_int },
 			{ Is_Int, Z3_mk_is_int  },
 			{ BVNot, Z3_mk_bvnot },
 			{ BVNeg, Z3_mk_bvneg } });
@@ -138,7 +137,7 @@ Term Z3Solver::make_term(int64_t i, const Sort &sort) const {
 	} else if (sk == REAL) {
 		z_term = ctx.real_val(i);
 	} else if (sk == BV) {
-		z_term = ctx.bv_val(sort->get_width(), i); //why did yices use const here
+		z_term = ctx.bv_val(sort->get_width(), i);
 	} else {
 		string msg("Can't create value ");
 		msg += i;
@@ -155,23 +154,16 @@ Term Z3Solver::make_term(const std::string val, const Sort &sort,
 	expr z_term = expr(ctx);
 	SortKind sk = sort->get_sort_kind();
 
-	if (sk == BV) {       //sort width or base??
-		z_term = ctx.bv_const(val.c_str(), sort->get_width()); //why am i throwing out base?
-	} else if (sk == REAL) {
-		if (base != 10) {
-			throw NotImplementedException(
-					"Does not support base not equal to 10.");
-		}
+	if (base != 10) {
+		throw NotImplementedException(
+			"Does not support base not equal to 10.");
+	}
 
+	if (sk == BV) {
+		z_term = ctx.bv_const(val.c_str(), sort->get_width());
+	} else if (sk == REAL) {
 		z_term = ctx.real_const(val.c_str());
 	} else if (sk == INT) {
-		if (base != 10) {
-			throw NotImplementedException(
-					"Does not support base not equal to 10.");
-		}
-//		int i = stoi(val);
-//		z_term = ctx.int_val(i);	//ugh why is this jumping between val and const
-
 		z_term = ctx.int_const(val.c_str());
 	} else {
 		string msg("Can't create value ");
@@ -189,10 +181,8 @@ Term Z3Solver::make_term(const Term &val, const Sort &sort) const {
 	std::shared_ptr<Z3Term> zterm = std::static_pointer_cast < Z3Term > (val);
 	std::shared_ptr<Z3Sort> zsort = std::static_pointer_cast < Z3Sort > (sort);
 
-//	**** Z3_mk_const_array (Z3_context c, Z3_sort domain, Z3_ast v)
-
-	if (zsort->is_function) {
-		throw IncorrectUsageException("no functions in arrays ? ? ? ?");
+	if (zsort->is_function || zterm->is_function) {
+		throw IncorrectUsageException("Arrays in functions are not supported for Z3"); //is this true?
 	}
 
 	Z3_ast c_array = Z3_mk_const_array(ctx, zsort->type, zterm->term);
@@ -370,41 +360,38 @@ Term Z3Solver::make_symbol(const std::string name, const Sort &sort) {
 	shared_ptr < Z3Sort > zsort = static_pointer_cast < Z3Sort > (sort);
 	const char *c = name.c_str();
 	z3::symbol z_name = ctx.str_symbol(c);
-	Z3_ast z_sym;
 
 	if (zsort->get_sort_kind() == FUNCTION) {
 		// nb this is creating a func_decl
+		func_decl sort_func = zsort->z_func;
 
-		sort_vector sorts(ctx);
-		sorts.push_back(ctx.bool_sort());
-		sorts.push_back(ctx.bool_sort());
+		sort_vector domain(ctx);
+		for (int i = 0; i < sort_func.arity(); i++) {
+			domain.push_back(sort_func.domain(i));
+		}
 
-		std::vector<z3::sort> zsorts;
-		zsorts.reserve(2);
-		zsorts.push_back(ctx.bool_sort());
-		zsorts.push_back(ctx.bool_sort());
-
-		z3::sort i_ex = ctx.int_sort();
-		func_decl z_func = ctx.function(c, sorts, i_ex);
-		z_sym = to_func_decl(ctx, z_func);
-		cout << z_func.arity() << endl;
-
-//		z_sym = ctx.function(z_name, zsort->z_func.arity(), zsort->z_func.domain(1), zsort->z_func.range());
-
+		func_decl z_func = ctx.function(c, domain, sort_func.range());
 		return std::make_shared<Z3Term> (z_func, ctx);
 	} else {
 		// nb this is creating an expr
 		expr z_term = ctx.constant(z_name, zsort->type);
-		z_sym = to_expr(ctx, z_term);
 
 		return std::make_shared<Z3Term> (z_term, ctx);
 	}
-
-//	return std::make_shared<Z3Term> (z_sym, ctx);
 }
 
 Term Z3Solver::make_param(const std::string name, const Sort &sort) {
 	throw NotImplementedException("make_param not supported by Z3 yet.");
+	shared_ptr < Z3Sort > zsort = static_pointer_cast < Z3Sort > (sort);
+	const char *c = name.c_str();
+	z3::symbol z_name = ctx.str_symbol(c);
+
+	if (zsort->is_function) {
+		throw IncorrectUsageException("Functions cannot be parameters");
+	}
+
+	expr z_term = ctx.constant(z_name, zsort->type);
+	return std::make_shared<Z3Term> (z_term, ctx);
 }
 
 Term Z3Solver::make_term(Op op, const Term &t) const {
@@ -412,12 +399,16 @@ Term Z3Solver::make_term(Op op, const Term &t) const {
 	shared_ptr<Z3Term> zterm = static_pointer_cast < Z3Term > (t);
 	Z3_ast res;
 
+	if (zterm->is_function){
+		throw IncorrectUsageException("Cannot make a unary operator term with a function.");
+	}
+
 	if (op.prim_op == Extract) {
 		if (op.idx0 < 0 || op.idx1 < 0) {
 			throw IncorrectUsageException(
 					"Can't have negative number in extract");
 		}
-		res = Z3_mk_extract(ctx, op.idx1, op.idx0, zterm->term);
+		res = Z3_mk_extract(ctx, op.idx0, op.idx1, zterm->term);
 	} else if (op.prim_op == Zero_Extend) {
 		if (op.idx0 < 0) {
 			throw IncorrectUsageException(
@@ -452,19 +443,12 @@ Term Z3Solver::make_term(Op op, const Term &t) const {
 		}
 		res = Z3_mk_int2bv(ctx, op.idx0, zterm->term);
 	} else if (op.prim_op == BV_To_Nat) {
-//	  	    if (op.idx0 < 0)
-//	  	    {
-//	  	      throw IncorrectUsageException(
-//	  	          "Can't have negative width in Int_To_BV op");
-//	  	    }
+		// n.b., the third parameter is a boolean is_signed, by flagging it false, this becomes bv2nat
 		res = Z3_mk_bv2int(ctx, zterm->term, false);
-
-		//return here or it will go into "not supported" message
 	}
 
 	else if (!op.num_idx) {
 		if (unary_ops.find(op.prim_op) != unary_ops.end()) {
-//			res = to_expr(ctx, unary_ops.at(op.prim_op)(ctx, zterm->term));
 			res = unary_ops.at(op.prim_op)(ctx, zterm->term);
 		} else {
 			string msg("Can't apply ");
@@ -484,8 +468,13 @@ Term Z3Solver::make_term(Op op, const Term &t) const {
 Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1) const {
 	shared_ptr<Z3Term> zterm0 = static_pointer_cast < Z3Term > (t0);
 	shared_ptr<Z3Term> zterm1 = static_pointer_cast < Z3Term > (t1);
-//	expr res = expr(ctx);
 	Z3_ast res;
+
+	if (zterm0->is_function || zterm1->is_function){
+		throw IncorrectUsageException("Cannot make a binary op term with a function.");
+	}
+
+	check_context(zterm0->term, zterm1->term);
 
 	if (!op.num_idx) {
 		if (binary_ops.find(op.prim_op) != binary_ops.end()) {
@@ -516,18 +505,18 @@ Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1,
 	Z3_ast res;
 
 	if (!op.num_idx) {
+		if (zterm0->is_function || zterm1->is_function || zterm2->is_function){
+			throw IncorrectUsageException("Cannot make a ternary op term with a function.");
+		}
+		check_context(zterm0->term, zterm1->term);
+		check_context(zterm0->term, zterm2->term);
+
 		if (ternary_ops.find(op.prim_op) != ternary_ops.end()) {
 			res = ternary_ops.at(op.prim_op)(ctx, zterm0->term, zterm1->term,
 					zterm2->term);
 		} else if (variadic_ops.find(op.prim_op) != variadic_ops.end()) {
 			Z3_ast terms[3] = { zterm0->term, zterm1->term, zterm2->term };
 			res = variadic_ops.at(op.prim_op)(ctx, 3, terms);
-//		}
-//		// TODO: Threw this is for term traversal, but it's not a fix.
-//		// Need to handle all "variadic" Ops this way with proper L/R association.
-//		else if (op.prim_op == Plus) {
-//			res = yices_add(yterm0->term,
-//					yices_add(yterm1->term, yterm2->term));
 		} else {
 			string msg("Can't apply ");
 			msg += op.to_string();
@@ -540,53 +529,58 @@ Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1,
 		throw IncorrectUsageException(msg);
 	}
 	if (zterm0->is_function && op.prim_op == Apply) {
+		if (zterm1->is_function || zterm2->is_function){
+			throw IncorrectUsageException("Cannot apply a function to more functions.");
+		}
+
 		Z3_ast args[2];
 		args[0] = zterm1->term;
 		args[1] = zterm2->term;
 		res = Z3_mk_app(ctx, zterm0->z_func, 2, args);
-		//is an application a function itself??
-//		return std::make_shared < Yices2Term > (to_expr(ctx, res), ctx);
-	} //else {
+		// is an application a function itself?? I'm inclined to say no
+		// if yes, i need to use to_func_decl and a different return
+	}
 	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
-//	}
 }
 
 Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 	size_t size = terms.size();
 	Z3_ast res;
-//	if (!size) {
-//		string msg("Can't apply ");
-//		msg += op.to_string();
-//		msg += " to zero terms.";
-//		throw IncorrectUsageException(msg);
-//	} else if (size == 1) {
-//		return make_term(op, terms[0]);
-//	} else if (size == 2) {
-//		return make_term(op, terms[0], terms[1]);
-//	} else if (size == 3) {
-//		return make_term(op, terms[0], terms[1], terms[2]);
-//	}
-//	} else if (op.prim_op == Apply) {
-//		vector < Z3_ast > zargs;
-//		zargs.reserve(size);
-//		shared_ptr < Z3Term > zterm;
-//
-//		// skip the first term (that's actually a function)
-//		for (size_t i = 1; i < terms.size(); i++) {
-//			zterm = static_pointer_cast < Z3Term > (ctx, terms[i]);
-//			zargs.push_back(zterm->term);
-//		}
-//
-//		zterm = static_pointer_cast < Z3Term > (terms[0]);
-//		if (!zterm->is_function)) {
-//			string msg(
-//					"Expecting an uninterpreted function to be used with Apply but got ");
-//			msg += terms[0]->to_string();
-//			throw IncorrectUsageException(msg);
-//		}
-//
-//		res = Z3_mk_app(ctx, zterm->z_func, size - 1, &zargs[0]);
-//	}
+
+	if (!size) {
+		string msg("Can't apply ");
+		msg += op.to_string();
+		msg += " to zero terms.";
+		throw IncorrectUsageException(msg);
+	} else if (size == 1) {
+		return make_term(op, terms[0]);
+	}
+
+	if (op.prim_op == Apply) {
+		vector < Z3_ast > zargs;
+		zargs.reserve(size-1);
+		shared_ptr < Z3Term > zterm;
+
+		// skip the first term (the function function)
+		for (size_t i = 1; i < terms.size(); i++) {
+			zterm = static_pointer_cast < Z3Term > (terms[i]);
+			if (zterm->is_function) {
+				throw IncorrectUsageException("Cannot use a function as an argument.");
+			}
+			zargs.push_back(zterm->term);
+		}
+
+		zterm = static_pointer_cast < Z3Term > (terms[0]);
+		if (!zterm->is_function) {
+			string msg(
+					"Expecting an uninterpreted function to be used with Apply but got ");
+			msg += terms[0]->to_string();
+			throw IncorrectUsageException(msg);
+		}
+
+		res = Z3_mk_app(ctx, zterm->z_func, size - 1, &zargs[0]);
+		return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
+	}
 
 	if (op.prim_op == Forall || op.prim_op == Exists) {
 		std::vector<expr> zterms;
@@ -594,6 +588,9 @@ Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 		std::shared_ptr<Z3Term> zterm;
 		for (auto t : terms) {
 			zterm = std::static_pointer_cast<Z3Term>(t);
+			if (zterm->is_function) {
+				throw IncorrectUsageException("quantifiers with functions not supported.");
+			}
 			zterms.push_back(zterm->term);
 		}
 		if (zterms.size() != 2){
@@ -603,10 +600,11 @@ Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 		}
 		expr quantified_body = zterms.back();
 		zterms.pop_back();
-		unsigned num_var = zterms.size();	// this will always be one
+		unsigned num_var = zterms.size();	// this will always be one when only allowing one parameter
 
-		// slightly redundant for one elem list, but good for later
-		// also kinda redundant to create new list from zterms, but c'est la vie
+		// below is a slight overcomplication for one parameter quantifiers
+		// but by keeping it, smt-switch can be extended to any number of parameters
+		// by removing the zterm.size() check
 		std::vector<Z3_ast> znames;
 		znames.reserve(terms.size() - 1);
 		std::vector<Z3_sort> zsorts;
@@ -617,21 +615,19 @@ Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 		for (auto t : znames) {
 			zsorts.push_back(Z3_get_sort(ctx, t));
 		}
-		cout << "names: ";
-		for (auto n : znames) { cout << to_expr(ctx, n) << " "; }
-		cout << endl << "sorts: ";
-		for (auto s : zsorts) { cout << to_sort(ctx, s) << " "; }
-		cout << endl << "body: " << quantified_body << endl;
-		cout << "num var: " << num_var << endl;
 
-		Z3_ast const nn[] = { znames[0] };
-		Z3_sort const ss[] = { zsorts[0] };
+		Z3_ast nn[znames.size()];// = { znames[0] };
+		std::copy(znames.begin(), znames.end(), nn);
+		Z3_sort ss[zsorts.size()];// = { zsorts[0] };
+		std::copy(zsorts.begin(), zsorts.end(), ss);
 
-		expr t0 = zterms[0];
-//		zterm = std::static_pointer_cast<Z3Term>(t0);
-		const char *c = (t0.to_string()).c_str();//name.c_str();
-		Z3_symbol const sym[] = { ctx.str_symbol(c) };
-		cout << "!! - " << c << endl;
+		expr t0 = expr(ctx); 
+		Z3_symbol sym[znames.size()];
+		for (int i = 0; i < znames.size(); i++) {
+			t0 = to_expr(ctx, nn[i]);
+			const char *c = (t0.to_string()).c_str();
+			sym[i] = ctx.str_symbol(c);
+		}
 
 		if (op.prim_op == Forall){
 			res = Z3_mk_forall(ctx, 0, 0, NULL, num_var, ss, sym, quantified_body);
@@ -639,43 +635,11 @@ Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 		if (op.prim_op == Exists){
 			res = Z3_mk_exists(ctx, 0, 0, NULL, num_var, ss, sym, quantified_body);
 		}
-		cout << ":)" << endl;
 		expr res2 = to_expr(ctx, res);
-		cout << ":)" << endl;
 		return std::make_shared < Z3Term > (res2, ctx);
-//		return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 	}
-//	std::vector<expr> zterms;
-//	zterms.reserve(terms.size());
-//	std::shared_ptr<Z3Term> zterm;
-//
-//	expr quantified_body = zterms.back();
-//	zterms.pop_back();
-////	expr bound_vars = solver.mkTerm(CVC4::api::BOUND_VAR_LIST, cterms);
-//	unsigned var = 0;//num var
-//	z3::sort sorts[] = {};
-//	func_decl names[] = {};
 
-//	if (op.prim_op == Forall) {
-//		throw IncorrectUsageException("nope");
-//
-//		//(Z3_context c, unsigned weight, unsigned num_patterns,
-//			//Z3_pattern const patterns[], unsigned num_decls,
-//			//Z3_sort const sorts[], Z3_symbol const decl_names[],
-//			//Z3_ast body)
-////		res = Z3_mk_forall(ctx, 0, 0, NULL, var, sorts, names, quantified_body);
-//	} else if (op.prim_op == Exists) {
-//		throw IncorrectUsageException("nope");
-//	}
-
-	if (!size) {
-		string msg("Can't apply ");
-		msg += op.to_string();
-		msg += " to zero terms.";
-		throw IncorrectUsageException(msg);
-	} else if (size == 1) {
-		return make_term(op, terms[0]);
-	} else if (size == 2) {
+	if (size == 2) {
 		return make_term(op, terms[0], terms[1]);
 	} else if (size == 3) {
 		return make_term(op, terms[0], terms[1], terms[2]);
@@ -690,8 +654,6 @@ Term Z3Solver::make_term(Op op, const TermVec &terms) const {
 		msg += " terms.";
 		throw IncorrectUsageException(msg);
 	}
-
-	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 }
 
 void Z3Solver::reset() {

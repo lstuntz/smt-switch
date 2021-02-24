@@ -57,6 +57,8 @@ class BoolectorSolver : public AbsSmtSolver
   void assert_formula(const Term & t) override;
   Result check_sat() override;
   Result check_sat_assuming(const TermVec & assumptions) override;
+  Result check_sat_assuming_list(const TermList & assumptions) override;
+  Result check_sat_assuming_set(const UnorderedTermSet & assumptions) override;
   void push(uint64_t num = 1) override;
   void pop(uint64_t num = 1) override;
   Term get_value(const Term & t) const override;
@@ -115,6 +117,11 @@ class BoolectorSolver : public AbsSmtSolver
   Term apply_prim_op(PrimOp op, TermVec terms) const;
   void dump_smt2(std::string filename) const override;
 
+  // getters for solver-specific objects
+  // for interacting with third-party Boolector-specific software
+
+  Btor * get_btor() const { return btor; };
+
  protected:
   Btor * btor;
   // store the names of created symbols
@@ -127,6 +134,34 @@ class BoolectorSolver : public AbsSmtSolver
   ///< reset_assertions yet
   ///< set this flag with set_opt("base-context-1", "true")
   size_t context_level = 0;  ///< tracks the current solving context level
+
+  // helper functions
+  template <class I>
+  inline Result check_sat_assuming(I it, const I & end)
+  {
+    std::shared_ptr<BoolectorTerm> bt;
+    while (it != end)
+    {
+      bt = std::static_pointer_cast<BoolectorTerm>(*it);
+      assert(boolector_get_width(bt->btor, bt->node) == 1);
+      boolector_assume(btor, bt->node);
+      ++it;
+    }
+
+    int32_t res = boolector_sat(btor);
+    if (res == BOOLECTOR_SAT)
+    {
+      return Result(SAT);
+    }
+    else if (res == BOOLECTOR_UNSAT)
+    {
+      return Result(UNSAT);
+    }
+    else
+    {
+      return Result(UNKNOWN);
+    }
+  }
 };
 }  // namespace smt
 

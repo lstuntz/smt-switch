@@ -84,6 +84,8 @@ class LoggingSolver : public AbsSmtSolver
   void assert_formula(const Term & t) override;
   Result check_sat() override;
   Result check_sat_assuming(const TermVec & assumptions) override;
+  Result check_sat_assuming_list(const TermList & assumptions) override;
+  Result check_sat_assuming_set(const UnorderedTermSet & assumptions) override;
   void push(uint64_t num = 1) override;
   void pop(uint64_t num = 1) override;
   void reset_assertions() override;
@@ -97,23 +99,11 @@ class LoggingSolver : public AbsSmtSolver
   // after a call to get_unsat_core
   std::unique_ptr<UnorderedTermMap> assumption_cache;
 
-  /** Maps the wrapped_solver's SolverEnum to the logging
-   *  solver version
-   *  throws an exception if the SolverEnum is already
-   *  a logging solver (there's no reason to nest
-   *  LoggingSolvers)
-   */
-  static SolverEnum process_solver_enum(SolverEnum se)
-  {
-    if (is_logging_solver_enum(se))
-    {
-      throw IncorrectUsageException(
-          std::string("Got a logging solver as the underlying solver in ")
-          + "LoggingSolver construction. There's no reason to "
-          + "next LoggingSolvers");
-    }
-    return get_logging_solver_enum(se);
-  }
+  // NOTE this is a little ugly, but this needs to be incremented
+  // in const methods (make_term), so it is marked mutable
+  // this was better than making them non-const because most solvers
+  // can respect the const-ness of those make_term functions
+  mutable size_t next_term_id;  ///< used to give LoggingTerms a unique id
 };
 
 }  // namespace smt

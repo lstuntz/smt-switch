@@ -14,6 +14,9 @@
 **
 **/
 
+#include <algorithm>
+#include <random>
+
 #include "utils.h"
 #include "ops.h"
 
@@ -102,7 +105,9 @@ void disjunctive_partition(const smt::Term & term,
   }
 }
 
-void get_free_symbolic_consts(const smt::Term &term, smt::TermVec &out)
+void get_matching_terms(const smt::Term & term,
+                    smt::UnorderedTermSet & out,
+                    bool (*matching_fun)(const smt::Term & term))
 {
   smt::TermVec to_visit({ term });
   smt::UnorderedTermSet visited;
@@ -115,15 +120,408 @@ void get_free_symbolic_consts(const smt::Term &term, smt::TermVec &out)
     if (visited.find(t) == visited.end()) {
       visited.insert(t);
 
-      if (t->is_symbolic_const()) {
-        out.push_back(t);
-      } else {// add children to queue
+      if (matching_fun(t))
+      {
+        out.insert(t);
+      }
+      else
+      {  // add children to queue
         for (auto tt : t) {
           to_visit.push_back(tt);
         }
       }
     }
   }
+}
+
+void get_free_symbolic_consts(const smt::Term & term,
+                              smt::UnorderedTermSet & out)
+{
+  auto f = [](const smt::Term & t) { return t->is_symbolic_const(); };
+  get_matching_terms(term, out, f);
+}
+
+void get_free_symbols(const smt::Term & term, smt::UnorderedTermSet & out)
+{
+  auto f = [](const smt::Term & t) { return t->is_symbol(); };
+  get_matching_terms(term, out, f);
+}
+
+void get_ops(const smt::Term & term, smt::UnorderedOpSet & out)
+{
+  smt::TermVec to_visit({ term });
+  smt::UnorderedTermSet visited;
+
+  smt::Term t;
+  while (to_visit.size()) {
+    t = to_visit.back();
+    to_visit.pop_back();
+    if (visited.find(t) == visited.end()) {
+      visited.insert(t);
+      Op op = t->get_op();
+      // Only add non-null operators to the set
+      if (!op.is_null()) {
+        out.insert(t->get_op());
+        // add children to queue
+        for (auto tt : t) {
+          to_visit.push_back(tt);
+        }
+      }
+    }
+  }
+}
+
+bool is_lit(const Term & l, const Sort & boolsort)
+{
+  // take a boolsort as an argument for sort aliasing solvers
+  if (l->get_sort() != boolsort)
+  {
+    return false;
+  }
+
+  if (l->is_symbolic_const())
+  {
+    return true;
+  }
+
+  Op op = l->get_op();
+  // check both for sort aliasing solvers
+  if (op == Not || op == BVNot)
+  {
+    Term first_child = *(l->begin());
+    return first_child->is_symbolic_const();
+  }
+
+  return false;
+}
+
+// ----------------------------------------------------------------------------
+
+UnsatCoreReducer::UnsatCoreReducer(SmtSolver reducer_solver)
+
+  : reducer_(reducer_solver),
+    to_reducer_(reducer_solver)
+{
+  reducer_->set_opt("produce-unsat-cores", "true");
+  reducer_->set_opt("incremental", "true");
+}
+
+UnsatCoreReducer::~UnsatCoreReducer()
+{
+}
+
+bool UnsatCoreReducer::reduce_assump_unsatcore(const Term &formula,
+                                               const TermVec &assump,
+                                               TermVec &out_red,
+                                               TermVec *out_rem,
+                                               unsigned iter,
+                                               unsigned rand_seed)
+{
+  TermVec bool_assump, local_assump;
+  UnorderedTermMap to_ext_assump;
+  TermVec cand_res;
+  for (const auto & a : assump) {
+    Term t = to_reducer_.transfer_term(a);
+    cand_res.push_back(t);
+    to_ext_assump[t] = a;
+  }
+
+  reducer_->push();
+  reducer_->assert_formula(to_reducer_.transfer_term(formula));
+
+  // exit if the formula is unsat without assumptions.
+  Result r = reducer_->check_sat();
+  if (r.is_unsat()) {
+    reducer_->pop();
+    return true;
+  }
+
+  if (rand_seed > 0) {
+    shuffle(cand_res.begin(), cand_res.end(),
+            std::default_random_engine(rand_seed));
+  }
+
+  for (const auto & a : cand_res) {
+    Term l = label(a);
+    reducer_->assert_formula(reducer_->make_term(Implies, l, a));
+    bool_assump.push_back(l);
+  }
+
+  unsigned cur_iter = 0;
+  bool first_iter = true;
+  while (cur_iter <= iter) {
+    cur_iter = iter > 0 ? cur_iter+1 : cur_iter;
+    r = reducer_->check_sat_assuming(bool_assump);
+
+    if (first_iter && r.is_sat()) {
+      reducer_->pop();
+      return false;
+    }
+
+    assert(r.is_unsat());
+
+    bool_assump.clear();
+    local_assump.clear();
+
+    UnorderedTermSet core_set;
+    reducer_->get_unsat_core(core_set);
+    for (const auto & a : cand_res) {
+      Term l = label(a);
+      if (core_set.find(l) != core_set.end()) {
+        local_assump.push_back(a);
+        bool_assump.push_back(l);
+      } else if (out_rem) {
+        // add the removed assumption in the out_rem (after translating to the
+        // external solver)
+        out_rem->push_back(to_ext_assump.at(a));
+      }
+    }
+
+    if (local_assump.size() == cand_res.size()) {
+      break;
+    } else {
+      cand_res = local_assump;
+    }
+
+    first_iter = false;
+  }
+
+  reducer_->pop();
+
+  // copy the result
+  for (const auto &a : cand_res) {
+    out_red.push_back(to_ext_assump.at(a));
+  }
+
+  return true;
+}
+
+bool UnsatCoreReducer::linear_reduce_assump_unsatcore(
+                              const smt::Term &formula,
+                              const smt::TermVec &assump,
+                              smt::TermVec &out_red,
+                              smt::TermVec *out_rem,
+                              unsigned iter)
+{
+  TermVec bool_assump;
+  UnorderedTermMap to_ext_assump;
+  TermVec cand_res;
+  for (const auto & a : assump) {
+    Term t = to_reducer_.transfer_term(a);
+    cand_res.push_back(t);
+    to_ext_assump[t] = a;
+  }
+
+  reducer_->push();
+  reducer_->assert_formula(to_reducer_.transfer_term(formula));
+
+  // exit if the formula is unsat without assumptions.
+  Result r = reducer_->check_sat();
+  if (r.is_unsat()) {
+    reducer_->pop();
+    return true;
+  }
+
+  UnorderedTermMap label_to_cand_;
+  for (const auto & a : cand_res) {
+    Term l = label(a);
+    reducer_->assert_formula(reducer_->make_term(Implies, l, a));
+    bool_assump.push_back(l);
+    label_to_cand_.emplace(l, a);
+  }
+
+  unsigned cur_iter = 0;
+  size_t assump_pos_for_removal = 0;
+  r = reducer_->check_sat_assuming(bool_assump);
+  if (r.is_sat()) {
+    reducer_->pop();
+    return false;
+  }
+  assert(r.is_unsat());
+
+  while (cur_iter <= iter && assump_pos_for_removal < bool_assump.size()) {
+    cur_iter = iter > 0 ? cur_iter+1 : cur_iter;
+
+    TermVec bool_assump_for_query;
+    bool_assump_for_query.reserve(bool_assump.size()-1);
+    for (size_t idx = 0; idx < bool_assump.size(); ++ idx) {
+      if (idx != assump_pos_for_removal)
+        bool_assump_for_query.push_back(bool_assump.at(idx));
+    }
+
+    r = reducer_->check_sat_assuming(bool_assump_for_query);
+    if (r.is_sat()) {
+      // we cannot remove this assumption, then try next one
+      ++ assump_pos_for_removal;
+    } else {
+      // we can remove this assumption
+      assert(r.is_unsat());
+
+      // the reason of using unsat core rather than the removal
+      // of bool_assump[bool_assump_for_query] is because
+      // the core could be even smaller
+      UnorderedTermSet core_set;
+      reducer_->get_unsat_core(core_set);
+      { // remove those not in core_set from bool_assump
+        TermVec new_bool_assump;
+        new_bool_assump.reserve(core_set.size());
+        for (const auto & l : bool_assump) {
+          if (core_set.find(l) != core_set.end())
+            new_bool_assump.push_back(l);
+        }
+        bool_assump.swap(new_bool_assump); // do "bool_assump = new_bool_assump" w.o. copy
+      }
+      assert(!bool_assump.empty());
+      assert(bool_assump.size() <= bool_assump_for_query.size());
+      // we don't need to change assump_pos_for_removal, because the size of
+      // bool_assump is reduced by at least one, so in the next round
+      // it is another element sitting at this location
+    } // end of the unsat case
+    // at this point, bool_assump should be the output
+  }
+
+  for (const auto & l : bool_assump) {
+    const Term & a = label_to_cand_.at(l);
+    out_red.push_back(to_ext_assump.at(a));
+  }
+
+  // in the case that we don't need the removed ones
+  // we don't have to iterate through the constraint vector
+  if (out_rem) {
+    UnorderedTermSet remaining_labels(bool_assump.begin(), bool_assump.end());
+    for (const auto & a : cand_res) {
+      Term l = label(a);
+      if (remaining_labels.find(l) == remaining_labels.end()) {
+        // add the removed assumption in the out_rem (after translating to the
+        // external solver)
+        out_rem->push_back(to_ext_assump.at(a));
+      }
+    } // for each in cand_res
+  } // if (out_red)
+
+  reducer_->pop();
+
+  return true;
+}
+
+Term UnsatCoreReducer::label(const Term & t)
+{
+  auto it = labels_.find(t);
+  if (it != labels_.end()) {
+    return labels_.at(t);
+  }
+
+  unsigned i = 0;
+  Term l;
+  while (true) {
+    try {
+      l = reducer_->make_symbol(
+          "assump_" + std::to_string(t->hash()) + "_" + std::to_string(i),
+          reducer_->make_sort(BOOL));
+      break;
+    }
+    catch (IncorrectUsageException & e) {
+      ++i;
+    }
+    catch (SmtException & e) {
+      throw e;
+    }
+  }
+
+  labels_[t] = l;
+  return l;
+}
+
+// ----------------------------------------------------------------------------
+
+DisjointSet::DisjointSet(bool (*c)(const smt::Term & a, const smt::Term & b))
+    : comp(c)
+{
+}
+
+DisjointSet::~DisjointSet() {}
+
+void DisjointSet::add(const Term & a, const Term & b)
+{
+  if (leader_.find(a) != leader_.end())
+  {
+    Term leadera = leader_.at(a);
+    UnorderedTermSet & groupa = group_.at(leadera);
+
+    if (leader_.find(b) != leader_.end())
+    {
+      Term leaderb = leader_.at(b);
+
+      if (leadera != leaderb)
+      {
+        UnorderedTermSet & groupb = group_.at(leaderb);
+
+        if (comp(leadera, leaderb))
+        {
+          // Choose according to the given ranking
+          groupa.insert(groupb.begin(), groupb.end());
+
+          for (const Term & t : groupb)
+          {
+            leader_[t] = leadera;
+          }
+          groupb.clear();
+          group_.erase(leaderb);
+        }
+        else
+        {
+          groupb.insert(groupa.begin(), groupa.end());
+
+          for (const Term & t : groupa)
+          {
+            leader_[t] = leaderb;
+          }
+          groupa.clear();
+          group_.erase(leadera);
+        }
+      }
+    }
+    else
+    {
+      groupa.insert(b);
+      leader_[b] = leadera;
+    }
+  }
+  else if (leader_.find(b) != leader_.end())
+  {
+    Term leaderb = leader_.at(b);
+    group_[leaderb].insert(a);
+    leader_[a] = leaderb;
+  }
+  else
+  {
+    // Choose according to the given Ranking
+    if (comp(a, b))
+    {
+      leader_[a] = a;
+      leader_[b] = a;
+      group_[a] = UnorderedTermSet({ a, b });
+    }
+    else
+    {
+      assert(!b->is_value());
+      leader_[a] = b;
+      leader_[b] = b;
+      group_[b] = UnorderedTermSet({ a, b });
+    }
+  }
+}
+
+Term DisjointSet::find(const Term & t) const
+{
+  assert(leader_.find(t) != leader_.end());
+  return leader_.at(t);
+}
+
+void DisjointSet::clear()
+{
+  leader_.clear();
+  group_.clear();
 }
 
 }  // namespace smt

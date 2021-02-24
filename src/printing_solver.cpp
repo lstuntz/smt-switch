@@ -17,23 +17,7 @@
 
 #include "printing_solver.h"
 #include "utils.h"
-
-/* string macros for the SMT-LIB commands */
-#define SET_OPTION_STR "set-option"
-#define SET_LOGIC_STR "set-logic"
-#define DECLARE_FUN_STR "declare-fun"
-#define DECLARE_SORT_STR "declare-sort"
-#define ASSERT_STR "assert"
-#define CHECK_SAT_STR "check-sat"
-#define CHECK_SAT_ASSUMING_STR "check-sat-assuming"
-#define GET_VALUE_STR "get-value"
-#define GET_UNSAT_ASSUMPTIONS_STR "get-unsat-assumptions"
-#define PUSH_STR "push"
-#define POP_STR "pop"
-#define RESET_ASSERTIONS_STR "reset-assertions"
-#define RESET_STR "reset"
-#define INTERPOLATION_GROUP_STR "interpolation-group"
-#define MSAT_GET_INTERPOLANT_STR "get-interpolant"
+#include "smtlib_utils.h"
 
 using namespace std;
 
@@ -285,12 +269,17 @@ Result PrintingSolver::get_interpolant(const Term & A,
    * The printing follows the internal implementation from msat_solver.h
    * in which the assertions are labeled by interpolation groups
    */
-  assert(style == PrintingStyleEnum::MSAT_STYLE);
-  (*out_stream) << "(" << ASSERT_STR << " (! " << A << " :" << INTERPOLATION_GROUP_STR << " g1))" << endl;
-  (*out_stream) << "(" << ASSERT_STR << " (! " << B << " :" << INTERPOLATION_GROUP_STR << " g2))" << endl;;
-  (*out_stream) << "(" << CHECK_SAT_STR << ")" << endl;
-  (*out_stream) << "(" << MSAT_GET_INTERPOLANT_STR << " (g1)" << ")" << endl;
-  (*out_stream) << "; when running mathsat, use `-interpolation=true` flag" << endl;
+  if (style == PrintingStyleEnum::MSAT_STYLE) {
+    (*out_stream) << "(" << ASSERT_STR << " (! " << A << " :" << INTERPOLATION_GROUP_STR << " g1))" << endl;
+    (*out_stream) << "(" << ASSERT_STR << " (! " << B << " :" << INTERPOLATION_GROUP_STR << " g2))" << endl;;
+    (*out_stream) << "(" << CHECK_SAT_STR << ")" << endl;
+    (*out_stream) << "(" << MSAT_GET_INTERPOLANT_STR << " (g1)" << ")" << endl;
+    (*out_stream) << "; when running mathsat, use `-interpolation=true` flag" << endl;
+  } else {
+    assert(style == PrintingStyleEnum::CVC4_STYLE);
+    (*out_stream) << "(" << ASSERT_STR << " " << A << ")" << endl;
+    (*out_stream) << "(" << CVC4_GET_INTERPOLANT_STR << " I (not " << B << "))" << endl;
+  }
   return wrapped_solver->get_interpolant(A, B, out_I);
 }
 

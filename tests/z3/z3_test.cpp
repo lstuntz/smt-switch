@@ -3,7 +3,8 @@
 
 #include "smt.h"
 #include "z3_sort.h"
-#include "z3++.h"
+
+#include "z3_factory.h"
 
 #include "z3_factory.h"
 

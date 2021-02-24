@@ -68,6 +68,7 @@ namespace smt {
     CVC4Term(CVC4::api::Term t) : term(t) {};
     ~CVC4Term() {};
     std::size_t hash() const override;
+    std::size_t get_id() const override;
     bool compare(const Term & absterm) const override;
     Op get_op() const override;
     Sort get_sort() const override;
@@ -83,10 +84,15 @@ namespace smt {
     TermIter end() override;
     std::string print_value_as(SortKind sk) override;
 
+    // getters for solver-specific objects
+    // for interacting with third-party CVC4-specific software
+    ::CVC4::api::Term get_cvc4_term() const { return term; };
+
    protected:
     CVC4::api::Term term;
 
   friend class CVC4Solver;
+  friend class CVC4InterpolatingSolver;
   };
 
 

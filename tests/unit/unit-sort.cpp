@@ -38,7 +38,7 @@ TEST(SortKind, ToString)
 }
 
 class UnitSortTests : public ::testing::Test,
-                      public ::testing::WithParamInterface<SolverEnum>
+                      public ::testing::WithParamInterface<SolverConfiguration>
 {
  protected:
   void SetUp() override
@@ -77,6 +77,9 @@ TEST_P(UnitSortTests, SameSortDiffObj)
   Sort bvsort_2 = s->make_sort(BV, 4);
   EXPECT_EQ(bvsort->hash(), bvsort_2->hash());
   EXPECT_EQ(bvsort, bvsort_2);
+
+  Sort bvsort8 = s->make_sort(BV, 8);
+  EXPECT_NE(bvsort, bvsort8);
 
   Sort funsort_2 = s->make_sort(FUNCTION, { bvsort, bvsort_2 });
   EXPECT_EQ(funsort->hash(), funsort_2->hash());
@@ -135,7 +138,7 @@ TEST_P(UnitSortTests, UninterpretedSort)
 
 TEST_P(UnitSortTests, UninterpSortEquality)
 {
-  if (is_logging_solver_enum(s->get_solver_enum()))
+  if (solver_has_attribute(s->get_solver_enum(), LOGGING))
   {
     return;
   }
@@ -147,7 +150,9 @@ TEST_P(UnitSortTests, UninterpSortEquality)
   }
   catch (SmtException & e)
   {
-    std::cout << "got exception for SolverEnum: " << GetParam() << std::endl;
+    SolverConfiguration sc = GetParam();
+    SolverEnum se = sc.solver_enum;
+    std::cout << "got exception for SolverEnum: " << se << std::endl;
     return;
   }
 
@@ -191,8 +196,18 @@ TEST_P(UnitSortArithTests, SameSortDiffObj)
   EXPECT_EQ(realsort, realsort_2);
 }
 
-INSTANTIATE_TEST_SUITE_P(ParameterizedUnitSortTests,
-                         UnitSortTests,
-                         testing::ValuesIn(available_solver_enums()));
+// One of the tests requries parsing values
+// of uninterpreted sorts.
+// This is not supported by the generic solver, and hence
+// it is excluded.
+INSTANTIATE_TEST_SUITE_P(
+    ParameterizedUnitSortTests,
+    UnitSortTests,
+    testing::ValuesIn(available_non_generic_solver_configurations()));
+
+INSTANTIATE_TEST_SUITE_P(ParameterizedUnitSortArithTests,
+                         UnitSortArithTests,
+                         testing::ValuesIn(filter_solver_configurations(
+                             { THEORY_INT, THEORY_REAL })));
 
 }  // namespace smt_tests

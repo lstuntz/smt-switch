@@ -27,14 +27,22 @@ using namespace std;
 namespace smt_tests {
 
 class UnsatCoreTests : public ::testing::Test,
-                 public ::testing::WithParamInterface<SolverEnum>
+                 public ::testing::WithParamInterface<SolverConfiguration>
 {
  protected:
   void SetUp() override
   {
-    s = create_solver(GetParam());
+    SolverConfiguration sc = GetParam();
+    s = create_solver(sc);
     s->set_opt("incremental", "true");
-    s->set_opt("produce-unsat-cores", "true");
+    if (sc.solver_enum == GENERIC_SOLVER)
+    {
+      s->set_opt("produce-unsat-assumptions", "true");
+    }
+    else
+    {
+      s->set_opt("produce-unsat-cores", "true");
+    }
     boolsort = s->make_sort(BOOL);
   }
   SmtSolver s;
@@ -61,13 +69,14 @@ TEST_P(UnsatCoreTests, UnsatCore)
   // make sure they are re-added correctly
   r = s->check_sat();
   ASSERT_TRUE(r.is_sat());
+  // unsat core is only available after a call to check-sat-assuming, not
+  // check-sat
   ASSERT_THROW(s->get_unsat_core(core), SmtException);
-  s->pop();
 }
 
 INSTANTIATE_TEST_SUITE_P(
     ParameterizedSolverUnsatCoreTests,
     UnsatCoreTests,
-    testing::ValuesIn(filter_solver_enums({ UNSAT_CORE })));
+    testing::ValuesIn(filter_solver_configurations({ UNSAT_CORE })));
 
 }  // namespace smt_tests

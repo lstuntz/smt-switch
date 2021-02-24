@@ -18,7 +18,6 @@
 
 #include <vector>
 
-//#include "gmp.h"
 #include "term.h"
 #include "utils.h"
 #include "z3++.h"
@@ -62,11 +61,14 @@ public:
 	   ctx = &c;
    };
    // Functions
-   Z3Term(func_decl zfunc, context &c) : term(c), is_function(true), z_func(zfunc) {};
+   Z3Term(func_decl zfunc, context &c) : term(c), is_function(true), z_func(zfunc) {
+	   ctx = &c;
+   };
 	~Z3Term() {
 	}
 	;
 	std::size_t hash() const override;
+	std::size_t get_id() const override;
 	bool compare(const Term &absterm) const override;
 	Op get_op() const override;
 	Sort get_sort() const override;

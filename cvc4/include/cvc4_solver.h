@@ -56,6 +56,8 @@ class CVC4Solver : public AbsSmtSolver
   void assert_formula(const Term & t) override;
   Result check_sat() override;
   Result check_sat_assuming(const TermVec & assumptions) override;
+  Result check_sat_assuming_list(const TermList & assumptions) override;
+  Result check_sat_assuming_set(const UnorderedTermSet & assumptions) override;
   void push(uint64_t num = 1) override;
   void pop(uint64_t num = 1) override;
   Term get_value(const Term & t) const override;
@@ -106,13 +108,56 @@ class CVC4Solver : public AbsSmtSolver
   void reset() override;
   void reset_assertions() override;
   void dump_smt2(std::string filename) const override;
+
   // helpers
   ::CVC4::api::Op make_cvc4_op(Op op) const;
+
+  // getters for solver-specific objects
+  // for interacting with third-party CVC4-specific software
+  ::CVC4::api::Solver & get_cvc4_solver() { return solver; };
 
  protected:
   ::CVC4::api::Solver solver;
   // keep track of created symbols
   std::unordered_map<std::string, Term> symbols;
+
+  // helper function
+  inline Result check_sat_assuming(
+      const std::vector<CVC4::api::Term> & cvc4assumps)
+  {
+    ::CVC4::api::Result r = solver.checkSatAssuming(cvc4assumps);
+    if (r.isUnsat())
+    {
+      return Result(UNSAT);
+    }
+    else if (r.isSat())
+    {
+      return Result(SAT);
+    }
+    else if (r.isSatUnknown())
+    {
+      return Result(UNKNOWN, r.getUnknownExplanation());
+    }
+    else
+    {
+      throw NotImplementedException("Unimplemented result type from CVC4");
+    }
+  }
 };
+
+//Interpolating Solver
+class CVC4InterpolatingSolver : public CVC4Solver
+{
+  public:
+    CVC4InterpolatingSolver() {}
+    CVC4InterpolatingSolver(const CVC4InterpolatingSolver &) = delete;
+    CVC4InterpolatingSolver & operator=(const CVC4InterpolatingSolver &) = delete;
+    ~CVC4InterpolatingSolver() {}
+
+    Result get_interpolant(const Term & A,
+                           const Term & B,
+                           Term & out_I) const override;
+};
+
 }  // namespace smt
 

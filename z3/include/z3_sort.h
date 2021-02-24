@@ -38,8 +38,8 @@ public:
 	;
 
 	// Functions
-	Z3Sort(sort z3sort, bool is_fun, func_decl zfunc, context &c) :
-			type(c), is_function(is_fun), z_func(zfunc) {
+	Z3Sort(func_decl zfunc, context &c) :
+			type(c), is_function(true), z_func(zfunc) {
 	}
 	;
 
@@ -54,12 +54,12 @@ public:
 	size_t get_arity() const override;
 	SortVec get_uninterpreted_param_sorts() const override;
 	Datatype get_datatype() const override;
-	bool compare(const Sort s) const override;
+	bool compare(const Sort &) const override;
 	SortKind get_sort_kind() const override;
 
 protected:
 	sort type;
-	func_decl z_func; //= func_decl(ctx);
+	func_decl z_func;
 	bool is_function;
 	context *ctx;
 

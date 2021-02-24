@@ -27,7 +27,7 @@ using namespace std;
 namespace smt_tests {
 
 class UnitQuantifierTests : public ::testing::Test,
-                            public testing::WithParamInterface<SolverEnum>
+                            public testing::WithParamInterface<SolverConfiguration>
 {
  protected:
   void SetUp() override
@@ -43,7 +43,7 @@ class UnitQuantifierTests : public ::testing::Test,
 };
 
 class UnitQuantifierIterTests : public ::testing::Test,
-                                public testing::WithParamInterface<SolverEnum>
+                                public testing::WithParamInterface<SolverConfiguration>
 {
  protected:
   void SetUp() override
@@ -83,7 +83,6 @@ TEST_P(UnitQuantifierIterTests, QuantifierTraversal)
   Term fx = s->make_term(Apply, f, x);
   Term bimpfxeq0 = s->make_term(
       Implies, b, s->make_term(Equal, fx, s->make_term(0, bvsort)));
-  ASSERT_THROW(s->make_term(Forall, b, x, bimpfxeq0), IncorrectUsageException);
   Term forallx = s->make_term(Forall, x, bimpfxeq0);
   Term forallbx = s->make_term(Forall, b, forallx);
   ASSERT_EQ(forallbx->get_sort(), boolsort);
@@ -111,11 +110,11 @@ TEST_P(UnitQuantifierIterTests, QuantifierFunCheck)
 INSTANTIATE_TEST_SUITE_P(
     ParameterizedQuantifierTests,
     UnitQuantifierTests,
-    testing::ValuesIn(filter_solver_enums({ QUANTIFIERS })));
+    testing::ValuesIn(filter_solver_configurations({ QUANTIFIERS })));
 
 INSTANTIATE_TEST_SUITE_P(ParameterizedQuantifierIterTests,
                          UnitQuantifierIterTests,
-                         testing::ValuesIn(filter_solver_enums({ QUANTIFIERS,
+                         testing::ValuesIn(filter_solver_configurations({ QUANTIFIERS,
                                                                  TERMITER })));
 
 }  // namespace smt_tests

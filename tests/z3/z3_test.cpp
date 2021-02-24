@@ -6,13 +6,11 @@
 
 #include "z3_factory.h"
 
-#include "z3_factory.h"
-
 using namespace smt;
 using namespace std;
 //using namespace z3;
 
-void printVec(string name, TermVec ts) {
+void print_vec(string name, TermVec ts) {
 	cout << name << ": ";
 	for(int i = 0; i < ts.size(); i++){
 		cout << ts[i] << " ";
@@ -139,23 +137,30 @@ int main() {
 	Term ext2 = s->make_term(Op(Zero_Extend, 1), bvterm);
 	cout << ext2 << endl;
 
-	Sort functionsort2 = s->make_sort(FUNCTION, SortVec{ boolsort1, boolsort1 } );
+	Sort functionsort2 = s->make_sort(FUNCTION, SortVec{ boolsort1, intsort1 } );
+	Sort functionsort3 = s->make_sort(FUNCTION, SortVec{ boolsort1, intsort1, boolsort1 } );
 	cout << "function exploration: " << endl;
 	cout << functionsort << endl;
 	Term funfun = s->make_symbol("hellooo", functionsort);
+	Term funfun2 = s->make_symbol("hellooo2", functionsort2);
+	Term funfun3 = s->make_symbol("hellooo3", functionsort3);
 	cout << ":)" << endl << funfun << endl;
 
 	Term appfun = s->make_term(Op(Apply), TermVec{ funfun, boolterm1, intterm, realterm });
+	Term appfun2 = s->make_term(Op(Apply), funfun2, boolterm1 );
+	Term appfun3 = s->make_term(Op(Apply), funfun3, boolterm1, intterm );
 	cout << appfun << endl;
+	cout << appfun2 << endl;
+	cout << appfun3 << endl;
 
 	cout << " * * * " << endl;
 	TermVec ts = { intterm, bvterm };
-	printVec("ts", ts);
+	print_vec("ts", ts);
 	std::vector<Term> t2;
 	t2.reserve(ts.size() - 1);
 	Term t = ts.back();
 	ts.pop_back();
-	printVec("ts later", ts);
+	print_vec("ts later", ts);
 
 	Term x = s->make_symbol("x", boolsort1);
 	Term y = s->make_symbol("y", boolsort1);
@@ -167,6 +172,9 @@ int main() {
 	cout << "*" << endl;
 	Term qterm =  s->make_term(Forall, TermVec{ x, impx });
 	cout << qterm << endl;
+
+	cout << "hash: " << x->hash() << endl;
+	cout << "id: " << x->get_id() << endl;
 
 	cout << "**" << endl;
 

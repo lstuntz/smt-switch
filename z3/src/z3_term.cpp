@@ -64,18 +64,19 @@ bool Z3TermIter::equal(const TermIterBase & other) const
 // Z3Term implementation
 
 size_t Z3Term::hash() const {
-	if (is_function) {
+	if (!is_function) {
 		return term.hash();
 	} else {
 		return z_func.hash();
 	}
-	return term.hash();
 }
 
-std::size_t Z3Term::get_id() const
-{
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+std::size_t Z3Term::get_id() const {
+	if (!is_function) {
+		return term.id();
+	} else {
+		return z_func.id();
+	}
 }
 
 bool Z3Term::compare(const Term &absterm) const {

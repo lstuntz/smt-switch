@@ -182,7 +182,7 @@ Term Z3Solver::make_term(const Term &val, const Sort &sort) const {
 	std::shared_ptr<Z3Sort> zsort = std::static_pointer_cast < Z3Sort > (sort);
 
 	if (zsort->is_function || zterm->is_function) {
-		throw IncorrectUsageException("Arrays in functions are not supported for Z3"); //is this true?
+		throw IncorrectUsageException("Cannot create constant array with function element");
 	}
 
 	Z3_ast c_array = Z3_mk_const_array(ctx, zsort->type, zterm->term);
@@ -377,7 +377,6 @@ Term Z3Solver::make_symbol(const std::string name, const Sort &sort) {
 }
 
 Term Z3Solver::make_param(const std::string name, const Sort &sort) {
-	throw NotImplementedException("make_param not supported by Z3 yet.");
 	shared_ptr < Z3Sort > zsort = static_pointer_cast < Z3Sort > (sort);
 	const char *c = name.c_str();
 	z3::symbol z_name = ctx.str_symbol(c);
@@ -467,6 +466,9 @@ Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1) const {
 	Z3_ast res;
 
 	if (zterm0->is_function || zterm1->is_function){
+		if (op.prim_op == Apply) {
+			return make_term(op, TermVec{ t0, t1 });
+		}
 		throw IncorrectUsageException("Cannot make a binary op term with a function.");
 	}
 
@@ -500,13 +502,17 @@ Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1,
 	shared_ptr<Z3Term> zterm2 = static_pointer_cast < Z3Term > (t2);
 	Z3_ast res;
 
-	if (!op.num_idx) {
-		if (zterm0->is_function || zterm1->is_function || zterm2->is_function){
-			throw IncorrectUsageException("Cannot make a ternary op term with a function.");
+	if (zterm0->is_function || zterm1->is_function || zterm2->is_function){
+		if (op.prim_op == Apply) {
+			return make_term(op, TermVec{ t0, t1, t2 });
 		}
-		check_context(zterm0->term, zterm1->term);
-		check_context(zterm0->term, zterm2->term);
+		throw IncorrectUsageException("Cannot make a ternary op term with a function.");
+	}
+	
+	check_context(zterm0->term, zterm1->term);
+	check_context(zterm0->term, zterm2->term);
 
+	if (!op.num_idx) {
 		if (ternary_ops.find(op.prim_op) != ternary_ops.end()) {
 			res = ternary_ops.at(op.prim_op)(ctx, zterm0->term, zterm1->term,
 					zterm2->term);
@@ -524,18 +530,7 @@ Term Z3Solver::make_term(Op op, const Term &t0, const Term &t1,
 		msg += " not supported for three term arguments";
 		throw IncorrectUsageException(msg);
 	}
-	if (zterm0->is_function && op.prim_op == Apply) {
-		if (zterm1->is_function || zterm2->is_function){
-			throw IncorrectUsageException("Cannot apply a function to more functions.");
-		}
-
-		Z3_ast args[2];
-		args[0] = zterm1->term;
-		args[1] = zterm2->term;
-		res = Z3_mk_app(ctx, zterm0->z_func, 2, args);
-		// is an application a function itself?? I'm inclined to say no
-		// if yes, i need to use to_func_decl and a different return
-	}
+	
 	return std::make_shared < Z3Term > (to_expr(ctx, res), ctx);
 }
 

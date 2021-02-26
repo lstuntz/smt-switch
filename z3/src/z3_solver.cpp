@@ -256,7 +256,7 @@ Result Z3Solver::check_sat()
   }
   else if (r == unknown)
   {
-    return Result(UNKNOWN);
+    return Result(UNKNOWN, slv.reason_unknown());
   }
   else
   {
@@ -266,20 +266,54 @@ Result Z3Solver::check_sat()
 
 Result Z3Solver::check_sat_assuming(const TermVec & assumptions)
 {
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+  z3::expr_vector z3assumps(ctx);
+
+  shared_ptr<Z3Term> za;
+  for (auto a : assumptions)
+  {
+    za = static_pointer_cast<Z3Term>(a);
+    z3assumps.push_back(za->term);
+  }
+
+  return check_sat_assuming(z3assumps);
+}
+
+Result Z3Solver::check_sat_assuming_list(const TermList & assumptions)
+{
+  z3::expr_vector z3assumps(ctx);
+
+  shared_ptr<Z3Term> za;
+  for (auto a : assumptions)
+  {
+    za = static_pointer_cast<Z3Term>(a);
+    z3assumps.push_back(za->term);
+  }
+
+  return check_sat_assuming(z3assumps);
+}
+
+Result Z3Solver::check_sat_assuming_set(const UnorderedTermSet & assumptions)
+{
+  z3::expr_vector z3assumps(ctx);
+
+  shared_ptr<Z3Term> za;
+  for (auto a : assumptions)
+  {
+    za = static_pointer_cast<Z3Term>(a);
+    z3assumps.push_back(za->term);
+  }
+
+  return check_sat_assuming(z3assumps);
 }
 
 void Z3Solver::push(uint64_t num)
 {
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+  slv.push();
 }
 
 void Z3Solver::pop(uint64_t num)
 {
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+  slv.pop(num);
 }
 
 Term Z3Solver::get_value(const Term & t) const

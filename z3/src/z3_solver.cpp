@@ -234,14 +234,34 @@ Term Z3Solver::make_term(const Term & val, const Sort & sort) const
 
 void Z3Solver::assert_formula(const Term & t)
 {
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+  std::shared_ptr<Z3Term> zterm = std::static_pointer_cast<Z3Term>(t);
+  if (zterm->is_function)
+  {
+    throw IncorrectUsageException(
+        "Attempted to assert a function directly to solver");
+  }
+  slv.add(zterm->term);
 }
 
 Result Z3Solver::check_sat()
 {
-  throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+  check_result r = slv.check();
+  if (r == unsat)
+  {
+    return Result(UNSAT);
+  }
+  else if (r == sat)
+  {
+    return Result(SAT);
+  }
+  else if (r == unknown)
+  {
+    return Result(UNKNOWN);
+  }
+  else
+  {
+    throw NotImplementedException("Unimplemented result type from Z3");
+  }
 }
 
 Result Z3Solver::check_sat_assuming(const TermVec & assumptions)

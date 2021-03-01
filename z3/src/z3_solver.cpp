@@ -86,13 +86,13 @@ const unordered_map<PrimOp, variadic_fun> variadic_ops({
 void Z3Solver::set_opt(const std::string option, const std::string value)
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Set opt not implemented for Z3 backend.");
 }
 
 void Z3Solver::set_logic(const std::string logic)
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Set logic not implemented for Z3 backend.");
 }
 
 Term Z3Solver::make_term(bool b) const
@@ -319,21 +319,20 @@ void Z3Solver::pop(uint64_t num)
 Term Z3Solver::get_value(const Term & t) const
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Get value not implemented for Z3 backend.");
 }
 
 UnorderedTermMap Z3Solver::get_array_values(const Term & arr,
                                             Term & out_const_base) const
 {
   throw NotImplementedException(
-      "Z3 does not support getting array values. Please use get_value on a "
-      "particular select of the array.");
+      "Get array values not implemented for Z3 backend.");
 }
 
 void Z3Solver::get_unsat_core(UnorderedTermSet & out)
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Get unsat core not implemented for Z3 backend.");
 }
 
 Sort Z3Solver::make_sort(const std::string name, uint64_t arity) const
@@ -872,20 +871,20 @@ Term Z3Solver::make_term(Op op, const TermVec & terms) const
 void Z3Solver::reset()
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Reset not implemented for Z3 backend.");
 }
 
 void Z3Solver::reset_assertions()
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Reset assertions not implemented for Z3 backend.");
 }
 
 Term Z3Solver::substitute(const Term term,
                           const UnorderedTermMap & substitution_map) const
 {
   throw NotImplementedException(
-      "Term iteration not implemented for Z3 backend.");
+      "Substitute not implemented for Z3 backend.");
 }
 
 void Z3Solver::dump_smt2(std::string filename) const
